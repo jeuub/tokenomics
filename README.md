@@ -37,6 +37,8 @@ opencode / Cline / aider через OpenAI-compatible) и LLM-провайдер
 | Файл | О чём |
 |---|---|
 | [docs/mvp-plan.md](docs/mvp-plan.md) | **Главный документ.** Тончайший продаваемый MVP (v0), что вырезано и почему, eval/guardrails, метрики успеха, roadmap v0→v1→v2 |
+| [docs/economics.md](docs/economics.md) | **Cost-модель (verified mid-2026).** Когда подход выгоден: внутри-Anthropic vs кросс-провайдерно, ценовая лестница, break-even формулы, session-таблицы, бизнес-порог |
+| [docs/model-ranking.md](docs/model-ranking.md) | **Мозг арбитра.** Как решать достаточность модели per-turn без хардкода и без вопросов к юзеру: priors → self-calibration → bandit cold-start; capability-профили; куда попадает новая модель |
 | [docs/architecture.md](docs/architecture.md) | Техническая реализация: data-path, arbiter pipeline, безопасная резка контекста, prompt-cache, дешёвый арбитр (L0→L1→L2), verify-and-escalate, decision-policy псевдо-спека, failure modes |
 | [docs/market-and-positioning.md](docs/market-and-positioning.md) | Карта конкурентов (группы A/B/C/D), белое пятно, позиционирование, ICP/покупатель, почему референс-репо слабый |
 | [docs/monetization-moat-risks.md](docs/monetization-moat-risks.md) | Pricing-модели, где durable moat, GTM (OSS wedge → cloud), **контрарианский разбор (7 причин смерти)**, win-conditions |
