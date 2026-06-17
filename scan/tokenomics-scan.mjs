@@ -98,22 +98,51 @@ if (!cc || cc.turns === 0) {
   process.exit(0);
 }
 const def = [...cc.models.entries()].sort((a, b) => b[1] - a[1])[0][0];
-const defKey = keyOf(def);
 const avgCtx = cc.ctx / cc.turns;
-const sv = estimate(defKey, avgCtx);
+
+// ---- режим оплаты: подписка (фикс) vs API-ключ (по токенам). БЕЗ обращения к Keychain. ----
+const apiEnv = process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN;
+let subType = null, hasCred = false;
+try {
+  const cf = join(H, ".claude", ".credentials.json");
+  if (existsSync(cf)) { hasCred = true; const c = JSON.parse(readFileSync(cf, "utf8")); subType = c.claudeAiOauth?.subscriptionType || c.subscriptionType || null; }
+} catch {}
+let mode;
+if (process.argv.includes("--api")) mode = "api";
+else if (process.argv.includes("--subscription")) mode = "sub";
+else if (apiEnv) mode = "api";
+else if (subType) mode = "sub";
+else if (hasCred) mode = "api";
+else mode = "sub"; // дефолт на macOS (подписочный OAuth в Keychain) — честнее НЕ обещать экономию
 
 console.log("  ТВОЙ ПРОФИЛЬ (факт из логов)");
 console.log("    ходов/период        " + cc.turns.toLocaleString());
 console.log("    средний контекст/ход ~" + k(avgCtx) + " токенов");
 console.log("    дефолт-модель        " + def + "  (" + Math.round(cc.models.get(def) * 100 / cc.turns) + "% ходов)");
-console.log("    реальный расход      ≈ " + f(cc.spend) + "  (твои токены × прайс-листы)");
 console.log("");
-console.log("  ОЦЕНКА С TOKENOMICS (иллюстративно, на твоём профиле)");
-console.log("    смешанная экономия   ≈ " + Math.round(sv * 100) + "%");
-console.log("    было → стало         " + f(cc.spend) + " → " + f(cc.spend * (1 - sv)) + "  ·  экономия ≈ " + f(cc.spend * sv) + "/период");
-console.log("");
-console.log("  Допущения: типовое распределение задач (trivial/routine/medium/hard), cheapest-sufficient");
-console.log("  среди провайдеров; ход уводим только когда он реально дешевле — иначе он остаётся на твоей");
-console.log("  модели (мы НИКОГДА не делаем ход дороже дефолта). free/сторонние имеют лимиты и условия по");
-console.log("  данным; кросс-провайдер ограничен твоей политикой чувствительности. Реальное число замеряется");
-console.log("  на твоём трафике после подключения. Ничего из этого не покинуло твою машину.\n");
+
+if (mode === "api") {
+  const sv = estimate(keyOf(def), avgCtx);
+  console.log("    режим оплаты         API-ключ (по токенам)");
+  console.log("    реальный расход      ≈ " + f(cc.spend) + "  (твои токены × прайс-листы)");
+  console.log("");
+  console.log("  ОЦЕНКА С TOKENOMICS (иллюстративно, на твоём профиле)");
+  console.log("    смешанная экономия   ≈ " + Math.round(sv * 100) + "%");
+  console.log("    было → стало         " + f(cc.spend) + " → " + f(cc.spend * (1 - sv)) + "  ·  экономия ≈ " + f(cc.spend * sv) + "/период");
+  console.log("");
+  console.log("  Допущения: типовое распределение задач, cheapest-sufficient среди провайдеров; ход уводим");
+  console.log("  только когда он реально дешевле — иначе остаётся на твоей модели (НИКОГДА не дороже дефолта).");
+  console.log("  free/сторонние имеют лимиты и условия по данным; кросс-провайдер ограничен политикой данных.");
+  console.log("  Реальное число замеряется на трафике после подключения. Ничего не покинуло твою машину.\n");
+} else {
+  console.log("    режим оплаты         ФИКС-ПЛАН (подписка Pro/Max" + (subType ? " · " + subType : "") + ")");
+  console.log("    использование $      ≈ " + f(cc.spend) + " по API-прайсу — это СУБСИДИЯ твоего плана,");
+  console.log("                         а НЕ то, что ты платишь (ты платишь фикс, напр. $200/мес за Max).");
+  console.log("");
+  console.log("  ⚑ TOKENOMICS ТЕБЕ НЕ ПОМОЖЕТ — честно.");
+  console.log("  Мы работаем только в режиме API-ключа и не можем перебить фикс-подписку: переход на");
+  console.log("  «API + мы» вышел бы ДОРОЖЕ твоего фикса — плоский тариф уже дешевле любого metered-арбитража.");
+  console.log("");
+  console.log("  Кому это помогает: тем, кто УЖЕ платит по токенам — API-ключ / Bedrock / Vertex, команды,");
+  console.log("  или объём сверх лимитов плана. Если ты на самом деле платишь по токенам — запусти с флагом --api.\n");
+}
