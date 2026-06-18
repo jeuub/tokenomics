@@ -3,21 +3,20 @@ import { getCopy } from "../../content/copy";
 import Proof from "./Proof.island.tsx";
 import { headingId } from "../../utils/a11y";
 
-const lang = Astro.currentLocale ?? "ru";
+const lang = "en";
 const c = getCopy(lang);
 const id = "act5";
 
-const isEn = lang === "en";
 const labels = {
   baseline: c.act5Baseline,
   routed: c.act5Routed,
   saved: c.act5Saved,
   proofLine: c.proofLine,
-  turnsLabel: isEn ? "turns / month" : "ходов / месяц",
-  contextLabel: isEn ? "avg context" : "сред. контекст",
-  modelLabel: isEn ? "default model" : "модель по умолчанию",
-  modelLow: isEn ? "lighter default" : "лёгкая по умолчанию",
-  modelHigh: isEn ? "heavier default" : "тяжёлая по умолчанию",
+  turnsLabel: "turns / month",
+  contextLabel: "avg context",
+  modelLabel: "default model",
+  modelLow: "lighter default",
+  modelHigh: "heavier default",
 };
 ---
 

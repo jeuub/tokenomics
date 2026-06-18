@@ -11,23 +11,5 @@ import { defineConfig } from "astro/config";
 // resolver, and the PostCSS plugin is bundler-agnostic.
 export default defineConfig({
   site: "https://tokenomics.example.com",
-  integrations: [
-    react(),
-    sitemap({
-      i18n: {
-        defaultLocale: "ru",
-        locales: {
-          ru: "ru-RU",
-          en: "en-US",
-        },
-      },
-    }),
-  ],
-  i18n: {
-    defaultLocale: "ru",
-    locales: ["ru", "en"],
-    routing: {
-      prefixDefaultLocale: false,
-    },
-  },
+  integrations: [react(), sitemap()],
 });

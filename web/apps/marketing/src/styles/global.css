@@ -11,3 +11,29 @@
  */
 @source "../../../../packages/ui/src/**/*.{ts,tsx}";
 @source "../../src/**/*.{astro,ts,tsx,html}";
+
+/* Scroll-reveal: sections start hidden, ScrollStage adds .is-in on enter. */
+@media (prefers-reduced-motion: no-preference) {
+  [data-reveal] {
+    opacity: 0;
+    transform: translateY(1.75rem);
+    transition:
+      opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+      transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: opacity, transform;
+  }
+  [data-reveal].is-in {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Faint vignette so the ASCII substrate reads against the page edges. */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -5;
+  pointer-events: none;
+  background: radial-gradient(120% 120% at 50% 0%, transparent 55%, color-mix(in oklch, var(--color-bg), black 40%) 100%);
+}

@@ -2,18 +2,17 @@
 import { getCopy } from "../../content/copy";
 import TurnLog from "../../components/transparency/TurnLog.island.tsx";
 
-const lang = Astro.currentLocale ?? "ru";
+const lang = "en";
 const c = getCopy(lang);
 const id = "act6";
 
-const isEn = lang === "en";
 const rowLabels = {
-  routedTo: isEn ? "routed to" : "маршрут",
-  why: isEn ? "why" : "почему",
+  routedTo: "routed to",
+  why: "why",
 };
 const toggleLabels = {
-  more: isEn ? "show all" : "показать все",
-  less: isEn ? "show fewer" : "свернуть",
+  more: "show all",
+  less: "show fewer",
 };
 ---
 

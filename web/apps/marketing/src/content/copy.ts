@@ -159,8 +159,10 @@ const ru: Copy = {
 
 const TABLE: Record<Locale, Copy> = { en, ru };
 
-export function getCopy(locale: string | null | undefined): Copy {
-  return locale === "en" ? TABLE.en : TABLE.ru;
+// The product/landing is English-only (founder directive). Locale is ignored;
+// the RU table is kept only so the type stays exhaustive and is never rendered.
+export function getCopy(_locale?: string | null): Copy {
+  return TABLE.en;
 }
 
 // Install snippet — verbatim, provider-neutral, NO real token.

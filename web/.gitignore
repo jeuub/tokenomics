@@ -19,6 +19,9 @@ test-results/
 **/paraglide/
 src/paraglide/
 
+# local dev helpers
+_shot.mjs
+
 # env / local
 .env
 .env.*
