@@ -1,21 +1,14 @@
 import { SmoothScroll } from "@tokenomics/engine-motion";
 import { useEffect, useRef } from "react";
 
-// Luminance ramps: sparse -> dense.
-const RAMP = " .:-=+*#%@";
-const RAMP_DENSE = ".:-=+*o#%@";
-const ACCENT: [number, number, number] = [55, 224, 140]; // ~ --color-accent
-
-// Hero signature grid (the "right-sizing" mass that thins as you scroll).
-const HW = 92;
-const HH = 16;
+// Hex-dump / matrix character set for the ambient field.
+const MATRIX = "0123456789ABCDEF#x@%X=+*·:";
 
 /**
  * Single ambient host for the landing:
- *  - a full-bleed 2D-canvas ASCII substrate (breathing field + a brightness band
- *    that sweeps with scroll),
- *  - the hero "right-sizing" signature: a dense ASCII mass (#hero-ascii) that thins
- *    to a lighter shape as the hero scrolls,
+ *  - a full-bleed 2D-canvas matrix field (dense, faint grey hex glyphs that slowly
+ *    flicker, with two brighter glitch patches near the side edges and a subtle
+ *    scroll-linked brightness band),
  *  - Lenis smooth scroll + IntersectionObserver section reveals.
  * Reduced-motion: one static frame, no RAF, no smooth scroll, no reveal-hiding.
  */
@@ -28,9 +21,8 @@ export default function ScrollStage() {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
-    const heroPre = document.getElementById("hero-ascii");
 
-    const CELL = 14;
+    const CELL = 13;
     let cols = 0;
     let rows = 0;
     const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
@@ -43,74 +35,52 @@ export default function ScrollStage() {
       canvas.style.width = `${w}px`;
       canvas.style.height = `${h}px`;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.font = `${CELL}px ui-monospace, "Geist Mono", monospace`;
+      ctx.font = `${CELL - 1}px ui-monospace, "Geist Mono", monospace`;
       ctx.textBaseline = "top";
-      cols = Math.ceil(w / CELL);
-      rows = Math.ceil(h / CELL);
+      cols = Math.ceil(w / CELL) + 1;
+      rows = Math.ceil(h / CELL) + 1;
     };
     resize();
     window.addEventListener("resize", resize);
 
-    const renderSubstrate = (time: number, sp: number): void => {
+    const render = (tMs: number): void => {
       const w = window.innerWidth;
       const h = window.innerHeight;
       ctx.clearRect(0, 0, w, h);
-      const bandY = (((sp * 1.7 - 0.35) % 1) + 1) % 1; // sweeps down with scroll
+      const time = tMs * 0.001;
+      const maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+      const sp = Math.min(1, Math.max(0, window.scrollY / maxScroll));
+      // Two brighter glitch patches that bob slowly near the side edges.
+      const b1x = 0.07;
+      const b1y = 0.52 + Math.sin(time * 0.5) * 0.07;
+      const b2x = 0.94;
+      const b2y = 0.44 + Math.cos(time * 0.42) * 0.07;
+      const bandY = ((sp * 1.3) % 1 + 1) % 1;
       for (let r = 0; r < rows; r++) {
-        const y = r / rows;
+        const ny = r / rows;
         for (let c = 0; c < cols; c++) {
-          const x = c / cols;
-          let v = Math.sin(x * 6 + time);
-          v += Math.sin(y * 5 - time * 0.7);
-          v += Math.sin((x + y) * 4 + time * 0.5);
-          v = (v / 3) * 0.5 + 0.5; // 0..1
-          const glow = Math.max(0, 1 - Math.abs(y - bandY) * 2.6);
-          const bright = Math.min(1, v * 0.6 + glow * 0.85);
-          const ch = RAMP[Math.floor(bright * (RAMP.length - 1))] ?? " ";
-          if (ch === " ") continue;
-          ctx.fillStyle = `rgba(${ACCENT[0]},${ACCENT[1]},${ACCENT[2]},${(0.06 + bright * 0.4).toFixed(3)})`;
+          const nx = c / cols;
+          const seed = c * 92821 + r * 1311;
+          const flip = Math.floor(time * 1.3 + Math.sin(seed) * 4);
+          const ch = MATRIX[((seed + flip) % MATRIX.length + MATRIX.length) % MATRIX.length] ?? "#";
+          let a = 0.04;
+          a += Math.max(0, 0.13 - Math.hypot(nx - b1x, ny - b1y) * 0.55);
+          a += Math.max(0, 0.13 - Math.hypot(nx - b2x, ny - b2y) * 0.55);
+          a += Math.max(0, 0.05 - Math.abs(ny - bandY) * 0.12);
+          ctx.fillStyle = `rgba(214,222,228,${a.toFixed(3)})`;
           ctx.fillText(ch, c * CELL, r * CELL);
         }
       }
     };
 
-    // The hero signature: an overdense mass that right-sizes (thins) with scroll.
-    const renderHero = (time: number): void => {
-      if (!heroPre) return;
-      const p = Math.min(1, Math.max(0, window.scrollY / Math.max(1, window.innerHeight)));
-      const thin = 0.18 + p * 0.55; // higher threshold -> more empty cells -> "right-sized"
-      let s = "";
-      for (let y = 0; y < HH; y++) {
-        const ny = y / HH;
-        for (let x = 0; x < HW; x++) {
-          const nx = x / HW;
-          let v = Math.sin(nx * 13 + time * 1.4);
-          v += Math.sin(ny * 8 - time * 1.1);
-          v += Math.sin((nx + ny) * 9 + time * 0.7);
-          v = (v / 3) * 0.5 + 0.5;
-          s += v > thin ? (RAMP_DENSE[Math.floor(v * (RAMP_DENSE.length - 1))] ?? " ") : " ";
-        }
-        s += "\n";
-      }
-      heroPre.textContent = s;
-    };
-
     let raf = 0;
-    const frame = (tMs: number): void => {
-      const time = tMs * 0.00035;
-      const maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
-      const sp = Math.min(1, Math.max(0, window.scrollY / maxScroll));
-      renderSubstrate(time, sp);
-      renderHero(time);
-    };
-
     if (reduced) {
-      frame(0);
+      render(0);
     } else {
       let last = 0;
       const loop = (t: number): void => {
-        if (t - last > 45) {
-          frame(t);
+        if (t - last > 60) {
+          render(t);
           last = t;
         }
         raf = requestAnimationFrame(loop);
@@ -129,7 +99,8 @@ export default function ScrollStage() {
     let io: IntersectionObserver | null = null;
     if (!reduced && typeof IntersectionObserver !== "undefined") {
       const sections = Array.from(document.querySelectorAll<HTMLElement>("main section"));
-      for (const s of sections) s.setAttribute("data-reveal", "");
+      // Don't hide the hero (first section) — it is the LCP and must paint instantly.
+      for (const s of sections.slice(1)) s.setAttribute("data-reveal", "");
       io = new IntersectionObserver(
         (entries) => {
           for (const e of entries) {
@@ -141,7 +112,7 @@ export default function ScrollStage() {
         },
         { threshold: 0.12 },
       );
-      for (const s of sections) io.observe(s);
+      for (const s of sections.slice(1)) io.observe(s);
     }
 
     const onBeforeSwap = (): void => {
@@ -161,7 +132,7 @@ export default function ScrollStage() {
   }, []);
 
   return (
-    // Decorative ambient substrate — not focusable (no tabindex), pointer-events-none.
+    // Decorative ambient matrix — not focusable (no tabindex), pointer-events-none.
     // biome-ignore lint/a11y/noAriaHiddenOnFocusable: decorative canvas, never focusable
     <canvas
       ref={canvasRef}
