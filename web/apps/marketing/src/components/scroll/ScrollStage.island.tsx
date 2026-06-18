@@ -1,16 +1,18 @@
 import { SmoothScroll } from "@tokenomics/engine-motion";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useEffect, useRef } from "react";
 
 // Hex-dump / matrix character set for the ambient field.
 const MATRIX = "0123456789ABCDEF#x@%X=+*·:";
 
 /**
- * Single ambient host for the landing:
- *  - a full-bleed 2D-canvas matrix field (dense, faint grey hex glyphs that slowly
- *    flicker, with two brighter glitch patches near the side edges and a subtle
- *    scroll-linked brightness band),
- *  - Lenis smooth scroll + IntersectionObserver section reveals.
- * Reduced-motion: one static frame, no RAF, no smooth scroll, no reveal-hiding.
+ * Single ambient + motion host for the landing:
+ *  - a full-bleed 2D-canvas matrix field (faint grey hex glyphs, row banding, two
+ *    brighter rectangular "glitch" blocks near the side edges, slow flicker),
+ *  - Lenis smooth scroll,
+ *  - a GSAP entrance timeline for the hero and ScrollTrigger reveals per section.
+ * Reduced-motion: one static frame, no RAF, no smooth scroll, no entrance/reveal.
  */
 export default function ScrollStage() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -22,7 +24,7 @@ export default function ScrollStage() {
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
 
-    const CELL = 13;
+    const CELL = 12;
     let cols = 0;
     let rows = 0;
     const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
@@ -35,13 +37,20 @@ export default function ScrollStage() {
       canvas.style.width = `${w}px`;
       canvas.style.height = `${h}px`;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.font = `${CELL - 1}px ui-monospace, "Geist Mono", monospace`;
+      ctx.font = `${CELL - 1}px "Geist Mono Variable", ui-monospace, monospace`;
       ctx.textBaseline = "top";
       cols = Math.ceil(w / CELL) + 1;
       rows = Math.ceil(h / CELL) + 1;
     };
     resize();
     window.addEventListener("resize", resize);
+
+    // Rectangular "glitch" blocks (normalized coords) near the side edges.
+    const inBlock = (nx: number, ny: number): number => {
+      const left = nx < 0.15 && ny > 0.4 && ny < 0.68;
+      const right = nx > 0.85 && ny > 0.34 && ny < 0.62;
+      return left || right ? 0.42 : 0;
+    };
 
     const render = (tMs: number): void => {
       const w = window.innerWidth;
@@ -50,24 +59,26 @@ export default function ScrollStage() {
       const time = tMs * 0.001;
       const maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
       const sp = Math.min(1, Math.max(0, window.scrollY / maxScroll));
-      // Two brighter glitch patches that bob slowly near the side edges.
-      const b1x = 0.07;
-      const b1y = 0.52 + Math.sin(time * 0.5) * 0.07;
-      const b2x = 0.94;
-      const b2y = 0.44 + Math.cos(time * 0.42) * 0.07;
       const bandY = ((sp * 1.3) % 1 + 1) % 1;
       for (let r = 0; r < rows; r++) {
         const ny = r / rows;
+        const band = 0.012 * Math.sin(r * 0.8 + time * 0.5); // faint row banding
         for (let c = 0; c < cols; c++) {
           const nx = c / cols;
           const seed = c * 92821 + r * 1311;
-          const flip = Math.floor(time * 1.3 + Math.sin(seed) * 4);
-          const ch = MATRIX[((seed + flip) % MATRIX.length + MATRIX.length) % MATRIX.length] ?? "#";
-          let a = 0.04;
-          a += Math.max(0, 0.13 - Math.hypot(nx - b1x, ny - b1y) * 0.55);
-          a += Math.max(0, 0.13 - Math.hypot(nx - b2x, ny - b2y) * 0.55);
-          a += Math.max(0, 0.05 - Math.abs(ny - bandY) * 0.12);
-          ctx.fillStyle = `rgba(214,222,228,${a.toFixed(3)})`;
+          const flip = Math.floor(time * 1.1 + Math.sin(seed) * 4);
+          const ch = MATRIX[(((seed + flip) % MATRIX.length) + MATRIX.length) % MATRIX.length] ?? "#";
+          let a = 0.1 + band * 1.5;
+          // vertical matrix-rain streaks: a bright head falls down each column.
+          const colSpeed = 0.05 + ((c * 73) % 11) * 0.013;
+          const headY = (((time * colSpeed + c * 0.0137) % 1) + 1) % 1;
+          a += Math.max(0, 0.24 - Math.abs(ny - headY) * 0.55);
+          // striped glitch blocks hugging the side edges.
+          const blk = inBlock(nx, ny);
+          if (blk > 0) a += blk * (r % 2 === 0 ? 1 : 0.45) * (0.9 + 0.1 * Math.sin(time * 2 + seed));
+          a += Math.max(0, 0.05 - Math.abs(ny - bandY) * 0.1);
+          if (a <= 0.02) continue;
+          ctx.fillStyle = `rgba(168,186,176,${Math.min(0.6, a).toFixed(3)})`;
           ctx.fillText(ch, c * CELL, r * CELL);
         }
       }
@@ -79,7 +90,7 @@ export default function ScrollStage() {
     } else {
       let last = 0;
       const loop = (t: number): void => {
-        if (t - last > 60) {
+        if (t - last > 55) {
           render(t);
           last = t;
         }
@@ -88,6 +99,7 @@ export default function ScrollStage() {
       raf = requestAnimationFrame(loop);
     }
 
+    // Smooth scroll (best-effort).
     let scroll: SmoothScroll | null = null;
     try {
       scroll = new SmoothScroll({ reducedMotion: reduced });
@@ -96,27 +108,52 @@ export default function ScrollStage() {
       scroll = null;
     }
 
-    let io: IntersectionObserver | null = null;
-    if (!reduced && typeof IntersectionObserver !== "undefined") {
-      const sections = Array.from(document.querySelectorAll<HTMLElement>("main section"));
-      // Don't hide the hero (first section) — it is the LCP and must paint instantly.
-      for (const s of sections.slice(1)) s.setAttribute("data-reveal", "");
-      io = new IntersectionObserver(
-        (entries) => {
-          for (const e of entries) {
-            if (e.isIntersecting) {
-              e.target.classList.add("is-in");
-              io?.unobserve(e.target);
-            }
-          }
-        },
-        { threshold: 0.12 },
-      );
-      for (const s of sections.slice(1)) io.observe(s);
+    // GSAP entrance + scroll reveals (skipped entirely under reduced-motion).
+    const triggers: ScrollTrigger[] = [];
+    const tweens: gsap.core.Tween[] = [];
+    if (!reduced) {
+      gsap.registerPlugin(ScrollTrigger);
+
+      // Hero entrance: staggered rise/fade of the marked elements.
+      const heroItems = gsap.utils.toArray<HTMLElement>("#act1 [data-anim]");
+      if (heroItems.length) {
+        tweens.push(
+          gsap.from(heroItems, {
+            y: 26,
+            opacity: 0,
+            duration: 0.85,
+            ease: "power3.out",
+            stagger: 0.1,
+            delay: 0.05,
+          }),
+        );
+      }
+
+      // Per-section reveals (every section after the hero). gsap.from is no-JS-safe:
+      // if JS never runs, content simply stays visible.
+      const sections = gsap.utils.toArray<HTMLElement>("main section");
+      sections.forEach((sec, i) => {
+        if (i === 0) return;
+        const items = sec.querySelectorAll<HTMLElement>(":scope > *");
+        if (!items.length) return;
+        const tw = gsap.from(items, {
+          y: 30,
+          opacity: 0,
+          duration: 0.75,
+          ease: "power3.out",
+          stagger: 0.08,
+          scrollTrigger: { trigger: sec, start: "top 78%" },
+        });
+        tweens.push(tw);
+        if (tw.scrollTrigger) triggers.push(tw.scrollTrigger);
+      });
+
+      ScrollTrigger.refresh();
     }
 
     const onBeforeSwap = (): void => {
-      io?.disconnect();
+      for (const t of triggers) t.kill();
+      for (const tw of tweens) tw.kill();
       if (raf) cancelAnimationFrame(raf);
       scroll?.destroy();
     };
@@ -126,7 +163,8 @@ export default function ScrollStage() {
       document.removeEventListener("astro:before-swap", onBeforeSwap);
       window.removeEventListener("resize", resize);
       if (raf) cancelAnimationFrame(raf);
-      io?.disconnect();
+      for (const t of triggers) t.kill();
+      for (const tw of tweens) tw.kill();
       scroll?.destroy();
     };
   }, []);

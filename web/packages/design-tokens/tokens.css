@@ -13,24 +13,24 @@
 @theme {
   /* ---- Color: dark terminal palette (--color-* namespace) ---- */
   /* Near-black phosphor background and warm off-white foreground. */
-  --color-bg: oklch(0.18 0.006 256);          /* #0d0f12-ish, deep slate-black */
-  --color-fg: oklch(0.93 0.008 106);          /* warm paper white */
-  --color-muted: oklch(0.62 0.012 256);       /* dimmed comment-grey */
-  --color-fg-muted: oklch(0.62 0.012 256);    /* dimmed foreground (text-fg-muted) */
-  --color-surface: oklch(0.24 0.006 256);     /* raised panel / input field */
-  --color-border: oklch(0.34 0.008 256);      /* component border / hairline */
-  --color-accent: oklch(0.82 0.17 142);       /* terminal green (prompt/cursor) */
-  --color-accent-strong: oklch(0.88 0.19 142);/* brighter accent for hover */
+  --color-bg: oklch(0.15 0.004 256);          /* near-black terminal backdrop */
+  --color-fg: oklch(0.97 0.004 106);          /* near-white */
+  --color-muted: oklch(0.64 0.012 256);       /* dimmed comment-grey */
+  --color-fg-muted: oklch(0.64 0.012 256);    /* dimmed foreground (text-fg-muted) */
+  --color-surface: oklch(0.21 0.006 256);     /* raised panel / input field */
+  --color-border: oklch(0.36 0.008 256);      /* component border / hairline */
+  --color-accent: oklch(0.86 0.205 153);      /* mint terminal green (prompt/cursor) */
+  --color-accent-strong: oklch(0.90 0.205 153);/* brighter accent for hover */
   --color-danger: oklch(0.66 0.20 25);        /* error red */
   --color-grid: oklch(0.30 0.008 256);        /* faint hairline / divider */
 
   /* ---- Fonts (--font-* namespace -> font-mono utility) ---- */
   --font-mono:
-    "Geist Mono", "Departure Mono", ui-monospace, "SF Mono", "Cascadia Code",
+    "Geist Mono Variable", "Geist Mono", ui-monospace, "SF Mono", "Cascadia Code",
     "Source Code Pro", Menlo, Consolas, "Liberation Mono", monospace;
   /* sans aliased to mono on purpose: this is a mono-first aesthetic. */
   --font-sans:
-    "Geist Mono", "Departure Mono", ui-monospace, "SF Mono", monospace;
+    "Geist Mono Variable", "Geist Mono", ui-monospace, "SF Mono", monospace;
 
   /* ---- Mono spacing scale in `ch` (--spacing-* namespace) ----
    * `ch` aligns to the monospace glyph cell, so columns line up like a TTY.

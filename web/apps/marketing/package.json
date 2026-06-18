@@ -17,6 +17,8 @@
     "tailwindcss": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
+    "@fontsource-variable/geist-mono": "^5.2.8",
+    "gsap": "^3.15.0",
     "@tokenomics/design-tokens": "workspace:*",
     "@tokenomics/ui": "workspace:*",
     "@tokenomics/engine-ascii": "workspace:*",

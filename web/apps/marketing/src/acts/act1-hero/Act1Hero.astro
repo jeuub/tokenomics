@@ -15,11 +15,14 @@ const proof = "Savings are measured, not promised.";
   class="relative flex min-h-dvh flex-col items-center justify-center px-ch4 text-center"
 >
   {/* Boot caret + provider-neutral context label. */}
-  <div class="mb-ch4 flex flex-col items-center gap-ch2">
-    <span aria-hidden="true" class="font-mono text-2xl leading-none text-accent motion-safe:animate-pulse">
+  <div data-anim class="mb-ch8 flex flex-col items-center gap-ch3">
+    <span
+      aria-hidden="true"
+      class="font-mono text-2xl leading-none text-accent motion-safe:animate-pulse"
+    >
       &#9612;
     </span>
-    <p class="font-mono text-xs uppercase tracking-[0.25em] text-accent">
+    <p class="font-mono text-xs uppercase tracking-[0.28em] text-accent">
       in front of claude code &amp; opencode
     </p>
   </div>
@@ -27,22 +30,26 @@ const proof = "Savings are measured, not promised.";
   {/* The single <h1> of the page. "Every turn." carries the accent. */}
   <h1
     id={headingId(id)}
-    class="mx-auto max-w-7xl font-mono text-5xl font-bold leading-[1.05] tracking-tight text-fg sm:text-6xl lg:text-7xl"
+    data-anim
+    class="mx-auto max-w-none font-mono text-[clamp(2.5rem,7vw,5.5rem)] font-black leading-[0.96] tracking-tight text-fg"
   >
-    Match the model to the task. <span class="text-accent">Every turn.</span>
+    Match the model<br />to the task. <span class="text-accent">Every turn.</span>
   </h1>
 
-  <p class="mt-ch6 max-w-[54ch] font-mono text-base leading-relaxed text-fg-muted sm:text-lg">
+  <p
+    data-anim
+    class="mt-ch6 max-w-[56ch] font-mono text-base leading-relaxed text-fg-muted sm:text-lg"
+  >
     {sub}
   </p>
 
-  <p class="mt-ch4 font-mono text-sm text-accent">{proof}</p>
+  <p data-anim class="mt-ch4 font-mono text-sm text-accent">{proof}</p>
 
-  <div class="mt-ch8 flex flex-wrap items-center justify-center gap-ch3">
+  <div data-anim class="mt-ch8 flex flex-wrap items-center justify-center gap-ch3">
     <a
       href="/signup"
       data-cursor="pointer"
-      class="bg-accent px-ch4 py-ch2 font-mono text-sm lowercase text-bg transition-opacity hover:opacity-90"
+      class="bg-accent px-ch4 py-ch2 font-mono text-sm font-medium lowercase text-bg transition-opacity hover:opacity-90"
     >
       [ connect your keys ]
     </a>
@@ -55,10 +62,4 @@ const proof = "Savings are measured, not promised.";
     </a>
   </div>
 
-  <p
-    aria-hidden="true"
-    class="absolute bottom-ch4 right-ch4 font-mono text-xs lowercase text-fg-muted"
-  >
-    scroll to route &#8595;
-  </p>
 </section>

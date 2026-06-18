@@ -28,12 +28,13 @@
   }
 }
 
-/* Faint vignette so the ASCII substrate reads against the page edges. */
+/* Very soft top-only vignette; must NOT darken the side edges where the matrix
+ * glitch blocks live, so the field reads edge-to-edge. */
 body::after {
   content: "";
   position: fixed;
   inset: 0;
   z-index: -5;
   pointer-events: none;
-  background: radial-gradient(120% 120% at 50% 0%, transparent 55%, color-mix(in oklch, var(--color-bg), black 40%) 100%);
+  background: linear-gradient(to bottom, color-mix(in oklch, var(--color-bg), black 22%) 0%, transparent 22%);
 }
