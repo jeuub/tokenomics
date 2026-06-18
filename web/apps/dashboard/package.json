@@ -1,0 +1,32 @@
+{
+  "name": "@tokenomics/dashboard",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.101.0",
+    "@tanstack/react-router": "^1.170.16",
+    "@tokenomics/api-client": "workspace:*",
+    "@tokenomics/design-tokens": "workspace:*",
+    "@tokenomics/i18n": "workspace:*",
+    "@tokenomics/ui": "workspace:*",
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.1",
+    "@tanstack/router-plugin": "^1.168.18",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "^5.2.0",
+    "tailwindcss": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:"
+  }
+}

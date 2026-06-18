@@ -1,0 +1,30 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# build artifacts
+dist/
+build/
+.astro/
+.vite/
+*.tsbuildinfo
+
+# test / e2e
+coverage/
+playwright-report/
+test-results/
+.playwright/
+
+# generated i18n output (Paraglide)
+**/paraglide/
+src/paraglide/
+
+# env / local
+.env
+.env.*
+!.env.example
+.DS_Store
+*.log
+
+# generated route tree (TanStack Router plugin regenerates it on dev/build)
+**/routeTree.gen.ts

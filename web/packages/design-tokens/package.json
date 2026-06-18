@@ -1,0 +1,17 @@
+{
+  "name": "@tokenomics/design-tokens",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": [
+    "*.css"
+  ],
+  "exports": {
+    "./tokens.css": "./tokens.css",
+    "./global.css": "./global.css"
+  },
+  "files": [
+    "tokens.css",
+    "global.css"
+  ]
+}

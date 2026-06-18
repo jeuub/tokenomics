@@ -1,0 +1,5 @@
+@import "tailwindcss";
+@import "@tokenomics/design-tokens/tokens.css";
+
+/* Scan the shared UI kit source (outside this app's auto-detected scope) */
+@source "../../../packages/ui/src";

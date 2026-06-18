@@ -1,0 +1,42 @@
+/*
+ * @tokenomics/design-tokens/global.css — optional shared base stylesheet.
+ *
+ * Two ways an app consumes this package:
+ *
+ *  A) Import ONLY tokens (app brings its own tailwind import + @source rules):
+ *       @import "tailwindcss";
+ *       @import "@tokenomics/design-tokens/tokens.css";
+ *       @source "../../../packages/ui/src";   // see NOTES
+ *
+ *  B) Import this global.css for the batteries-included base. It pulls in
+ *     Tailwind + tokens + a tiny base layer. The app STILL must add its own
+ *     @source line(s) for workspace packages in its OWN entry css, because
+ *     @source paths resolve relative to the file they are written in and the
+ *     relative depth differs per app:
+ *       @import "@tokenomics/design-tokens/global.css";
+ *       @source "../../../packages/ui/src";   // path relative to the app css
+ */
+
+@import "tailwindcss";
+@import "./tokens.css";
+
+@layer base {
+  html {
+    font-family: var(--font-mono);
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-fg);
+    /* crisp glyphs on the phosphor-dark background */
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    font-variant-ligatures: none;
+  }
+
+  ::selection {
+    background-color: var(--color-accent);
+    color: var(--color-bg);
+  }
+}

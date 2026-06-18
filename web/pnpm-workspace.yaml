@@ -1,0 +1,26 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Allow these dependencies to run their install/build scripts (pnpm 10 blocks
+# postinstall scripts by default). esbuild needs its native binary for the
+# Vite/Astro build pipeline; sharp is Astro's image optimizer.
+onlyBuiltDependencies:
+  - esbuild
+  - sharp
+
+# pnpm 10 catalog (default). Member packages pin these with "catalog:".
+# Centrally pins the SHARED versions so both apps stay in lockstep.
+catalog:
+  react: ^19.2.7
+  react-dom: ^19.2.7
+  '@types/react': ^19.2.17
+  '@types/react-dom': ^19.2.3
+  typescript: ^6.0.3
+  # Vite pinned to 7.x: Astro 6 bundles Vite 7, and @tailwindcss/vite 4.3.1
+  # crashes on Vite 8's Rolldown resolver ("Missing field tsconfigPaths").
+  # Bump to ^8 once @tailwindcss/vite ships Rolldown-compatible support.
+  vite: ^7.3.5
+  tailwindcss: ^4.3.1
+  '@biomejs/biome': ^2.5.0
+  vitest: ^4.1.9

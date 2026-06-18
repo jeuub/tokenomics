@@ -1,0 +1,23 @@
+{
+  "name": "@tokenomics/i18n",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./messages": "./src/paraglide/messages.js",
+    "./runtime": "./src/paraglide/runtime.js"
+  },
+  "files": [
+    "src/paraglide",
+    "messages",
+    "project.inlang"
+  ],
+  "scripts": {
+    "compile": "paraglide-js compile --project ./project.inlang --outdir ./src/paraglide --emit-ts-declarations",
+    "build": "paraglide-js compile --project ./project.inlang --outdir ./src/paraglide --emit-ts-declarations",
+    "dev": "paraglide-js compile --project ./project.inlang --outdir ./src/paraglide --emit-ts-declarations --watch"
+  },
+  "devDependencies": {
+    "@inlang/paraglide-js": "^2.20.0"
+  }
+}

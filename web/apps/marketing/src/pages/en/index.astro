@@ -1,0 +1,27 @@
+---
+import Hero from "../../components/Hero.tsx";
+import Base from "../../layouts/Base.astro";
+---
+
+<Base title="tokenomics" description="The right tool for the job.">
+  <main class="mx-auto max-w-3xl px-6 py-24">
+    <section class="mb-24">
+      <Hero client:visible heading="tokenomics" cta="Get started" />
+    </section>
+
+    <section class="mb-16 border-t border-zinc-800 pt-8">
+      <h2 class="mb-2 text-xl font-semibold">The right tool, no overkill</h2>
+      <p class="text-zinc-400">Pick by requirements, not by hype.</p>
+    </section>
+
+    <section class="mb-16 border-t border-zinc-800 pt-8">
+      <h2 class="mb-2 text-xl font-semibold">Transparent costs</h2>
+      <p class="text-zinc-400">Savings follow from the right choice.</p>
+    </section>
+
+    <section class="border-t border-zinc-800 pt-8">
+      <h2 class="mb-2 text-xl font-semibold">Provider-neutral</h2>
+      <p class="text-zinc-400">No lock-in to a single vendor.</p>
+    </section>
+  </main>
+</Base>

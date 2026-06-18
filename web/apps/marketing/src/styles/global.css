@@ -1,0 +1,13 @@
+@import "tailwindcss";
+
+/* Shared @theme terminal/mono design tokens (one tokens.css for both apps). */
+@import "@tokenomics/design-tokens/tokens.css";
+
+/*
+ * Tailwind v4 automatic content detection ignores anything in node_modules,
+ * and pnpm symlinks workspace packages into node_modules. Register the shared
+ * UI kit source explicitly so its class names are scanned. Paths are relative
+ * to THIS stylesheet (web/apps/marketing/src/styles/).
+ */
+@source "../../../../packages/ui/src/**/*.{ts,tsx}";
+@source "../../src/**/*.{astro,ts,tsx,html}";

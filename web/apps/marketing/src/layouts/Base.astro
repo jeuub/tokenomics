@@ -1,0 +1,25 @@
+---
+import "../styles/global.css";
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const { title = "tokenomics", description = "" } = Astro.props;
+const lang = Astro.currentLocale ?? "ru";
+---
+
+<!doctype html>
+<html lang={lang} class="bg-black text-zinc-100">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <title>{title}</title>
+  </head>
+  <body class="min-h-dvh font-mono antialiased">
+    <slot />
+  </body>
+</html>

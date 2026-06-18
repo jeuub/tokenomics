@@ -1,0 +1,8 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "hero_title": "Платите за токены, а не за переплату",
+  "hero_sub": "Подбирайте правильную модель под задачу — без избыточности.",
+  "cta_connect": "Подключить",
+  "nav_pricing": "Цены",
+  "nav_docs": "Документация"
+}
