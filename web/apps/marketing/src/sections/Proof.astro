@@ -1,0 +1,67 @@
+---
+// ACT 5 · PROOF / ESTIMATOR — widgets from @tokenomics/ui/widgets, math from
+// @tokenomics/pricing-core (wired by the controller).
+---
+<section id="proof" style="position:relative; padding:150px 28px; border-top:1px solid #1c1c1e;">
+  <div style="max-width:1080px; margin:0 auto;">
+    <h2 data-reveal style="margin:0; font-size:12px; letter-spacing:0.18em; color:#6cf0a8; text-transform:uppercase; font-weight:400;">// estimate the range</h2>
+    <div data-reveal style="margin-top:22px; font-size:clamp(20px,2.2vw,28px); font-weight:600; letter-spacing:-0.02em; max-width:760px; text-wrap:pretty;">Put in your own numbers. This is an <span style="color:#6cf0a8;">estimate</span>, not a promise — your real savings are measured on your traffic, against your default model, at equal acceptance.</div>
+
+    <div style="margin-top:48px; display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:48px; align-items:start;">
+
+      <div data-reveal style="display:flex; flex-direction:column; gap:24px;">
+        <div>
+          <div style="display:flex; justify-content:space-between; font-size:12px; color:#a9a9a2;"><span>turns / month</span><span id="estTurnsVal" style="color:#6cf0a8;">40,000</span></div>
+          <pre id="slTurns" tabindex="0" role="slider" aria-label="turns per month" aria-valuemin="2000" aria-valuemax="150000" aria-valuenow="40000" data-cursor style="display:inline-block; margin:8px 0 0; font-size:15px; color:#6cf0a8; letter-spacing:1px; cursor:ew-resize; outline:none; user-select:none; touch-action:none;">[░░░░░░░░░░░░░░░░░░░░░░░░]</pre>
+        </div>
+        <div>
+          <div style="display:flex; justify-content:space-between; font-size:12px; color:#a9a9a2;"><span>avg context / turn</span><span id="estCtxVal" style="color:#6cf0a8;">18k tok</span></div>
+          <pre id="slCtx" tabindex="0" role="slider" aria-label="average context per turn in thousands of tokens" aria-valuemin="4" aria-valuemax="48" aria-valuenow="18" data-cursor style="display:inline-block; margin:8px 0 0; font-size:15px; color:#6cf0a8; letter-spacing:1px; cursor:ew-resize; outline:none; user-select:none; touch-action:none;">[░░░░░░░░░░░░░░░░░░░░░░░░]</pre>
+        </div>
+        <div>
+          <div style="font-size:12px; color:#a9a9a2; margin-bottom:8px;">your default model (the baseline)</div>
+          <div style="display:inline-flex; border:1px solid #3a3a3c;">
+            <button id="defOpus" data-cursor style="font-size:12.5px; padding:8px 14px; border:0; cursor:pointer; background:#6cf0a8; color:#0a0a0b;">Opus 4.8</button>
+            <button id="defSonnet" data-cursor style="font-size:12.5px; padding:8px 14px; border:0; border-left:1px solid #3a3a3c; cursor:pointer; background:transparent; color:#e6e6e1;">Sonnet 4.6</button>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:12px; color:#a9a9a2; margin-bottom:8px;">routing pool</div>
+          <button id="poolToggle" role="switch" aria-checked="true" data-cursor style="font-size:12.5px; padding:9px 14px; border:1px solid #3a3a3c; cursor:pointer; background:transparent; color:#e6e6e1; text-align:left; width:100%;"><span id="poolState" style="color:#6cf0a8;">[x]</span> allow third-party &amp; free tiers (DeepSeek · GLM · Gemini · Qwen)</button>
+          <div style="margin-top:8px; font-size:11px; color:#55554f;">off → Anthropic-only pool: routine drops to Haiku, savings shrink. Both are honest.</div>
+        </div>
+        <div>
+          <div style="display:flex; justify-content:space-between; font-size:12px; color:#a9a9a2;"><span>quality headroom (effort)</span><span id="effortval" style="color:#6cf0a8;">4 / 10</span></div>
+          <pre id="slEffort" tabindex="0" role="slider" aria-label="quality headroom" aria-valuemin="0" aria-valuemax="10" aria-valuenow="4" data-cursor style="display:inline-block; margin:8px 0 0; font-size:15px; color:#6cf0a8; letter-spacing:2px; cursor:ew-resize; outline:none; user-select:none; touch-action:none;">[████░░░░░░]</pre>
+          <div style="margin-top:6px; font-size:11px; color:#55554f;">higher → more turns kept on your model → smaller savings.</div>
+        </div>
+      </div>
+
+      <div data-reveal>
+        <div style="font-size:13px; color:#a9a9a2;">estimated savings vs your default</div>
+        <div style="display:flex; align-items:flex-end; gap:14px; flex-wrap:wrap; margin-top:4px;">
+          <div id="savings" style="font-family:'Doto'; font-weight:900; font-size:clamp(56px,11vw,120px); line-height:0.9; color:#6cf0a8; letter-spacing:-0.01em;">$0</div>
+          <div style="font-size:13px; color:#a9a9a2; padding-bottom:14px; line-height:1.7;">/ mo<br /><span id="estPct" style="color:#55554f;">—</span></div>
+        </div>
+        <div id="estRange" style="font-size:12px; color:#55554f; margin-top:4px;">range —</div>
+
+        <div style="margin-top:26px; display:grid; gap:9px; font-size:12px;">
+          <div style="display:flex; gap:12px; align-items:center;"><span style="width:58px; color:#a9a9a2;">default</span><pre id="barDefault" style="margin:0; color:#fff; letter-spacing:1px;">██████████████████████</pre><span id="costDefault" style="color:#a9a9a2; margin-left:auto;">$0</span></div>
+          <div style="display:flex; gap:12px; align-items:center;"><span style="width:58px; color:#a9a9a2;">routed</span><pre id="barRouted" style="margin:0; color:#6cf0a8; letter-spacing:1px;">░░░░░░░░░░░░░░░░░░░░░░</pre><span id="costRouted" style="color:#6cf0a8; margin-left:auto;">$0</span></div>
+        </div>
+
+        <div style="margin-top:24px; border-top:1px solid #1c1c1e; padding-top:18px; font-size:12px; color:#a9a9a2; line-height:1.9;">
+          <div style="color:#55554f; margin-bottom:6px;">where the turns go (illustrative mix)</div>
+          <div id="estMix"></div>
+        </div>
+
+        <div style="margin-top:18px; font-size:11px; color:#55554f; line-height:1.7;">
+          <span id="estKept" style="color:#a9a9a2;"></span> reasoning &amp; architecture turns stay on your model — we never make a turn more expensive than your default.
+        </div>
+        <div style="margin-top:14px; font-size:10.5px; color:#46453f; line-height:1.7;" role="note">
+          Illustrative only. Assumes blended list prices (Opus 4.8 ~$15 · Sonnet 4.6 ~$3 · Haiku 4.5 ~$0.8 · GLM-4.6 ~$0.6 · DeepSeek V4-Flash ~$0.3 · Qwen-Flash ~$0.2 · Gemini 2.5 Flash-Lite ~$0.15 per Mtok) and a typical task distribution. Free tiers carry rate limits and data terms; cross-provider routing is bounded by your sensitivity policy; subscription plans have different economics. Your real number is measured on your own traffic.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

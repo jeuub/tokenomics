@@ -1,0 +1,29 @@
+---
+// ACT 3 · MECHANISM — horizontal pin (controller drives #mechtrack x).
+---
+<section id="mech" style="position:relative; height:100vh; overflow:hidden; border-top:1px solid #1c1c1e;">
+  <div style="position:absolute; top:34px; left:28px; z-index:4; font-size:12px; letter-spacing:0.18em; color:#6cf0a8; text-transform:uppercase;">// life of one turn</div>
+  <div style="height:100%; display:flex; align-items:center;">
+    <div id="mechtrack" style="display:flex; align-items:stretch; gap:0; padding:0 8vw; will-change:transform;">
+      <div style="flex:none; width:78vw; max-width:760px; display:flex; flex-direction:column; justify-content:center; padding-right:7vw;">
+        <div style="font-family:'Doto'; font-weight:900; font-size:64px; color:#1c1c1e; line-height:1;">01</div>
+        <div style="font-size:clamp(22px,2.4vw,34px); font-weight:600; letter-spacing:-0.02em; margin-top:12px;">A request arrives.</div>
+        <p style="font-size:14px; color:#a9a9a2; line-height:1.6; max-width:440px; margin-top:14px;">The agent sends a turn — context, tools, the lot. It assumes it&rsquo;ll be answered by the most expensive model available. It won&rsquo;t.</p>
+        <pre style="margin:18px 0 0; font-size:12px; color:#55554f; line-height:1.6;">→ 14.2k ctx · tools=[edit,bash,read,grep]</pre>
+      </div>
+      <div style="flex:none; width:78vw; max-width:760px; display:flex; flex-direction:column; justify-content:center; padding-right:7vw;">
+        <div style="font-family:'Doto'; font-weight:900; font-size:64px; color:#1c1c1e; line-height:1;">02</div>
+        <div style="font-size:clamp(22px,2.4vw,34px); font-weight:600; letter-spacing:-0.02em; margin-top:12px;">We read the turn.</div>
+        <p style="font-size:14px; color:#a9a9a2; line-height:1.6; max-width:440px; margin-top:14px;">Trivial, background, code, or reasoning? We classify it, then weigh price against capability across every provider you&rsquo;ve allowed.</p>
+        <pre style="margin:18px 0 0; font-size:12px; color:#55554f; line-height:1.6;">classify → code · medium
+candidates → haiku-4.5 glm-4.6 deepseek-v4 …</pre>
+      </div>
+      <div style="flex:none; width:78vw; max-width:760px; display:flex; flex-direction:column; justify-content:center; padding-right:7vw;">
+        <div style="font-family:'Doto'; font-weight:900; font-size:64px; color:#1c1c1e; line-height:1;">03</div>
+        <div style="font-size:clamp(22px,2.4vw,34px); font-weight:600; letter-spacing:-0.02em; margin-top:12px;">Matched <span id="pick" style="color:#6cf0a8;">to the task</span>.</div>
+        <p style="font-size:14px; color:#a9a9a2; line-height:1.6; max-width:440px; margin-top:14px;">Tool calls and streaming stay intact. If the cheap model stumbles, we escalate automatically — and it&rsquo;s always visible in the log.</p>
+        <pre style="margin:18px 0 0; font-size:12px; color:#6cf0a8; line-height:1.6;">route → haiku-4.5 · −$0.21 this turn · verified</pre>
+      </div>
+    </div>
+  </div>
+</section>

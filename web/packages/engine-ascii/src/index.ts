@@ -1,317 +1,186 @@
-// @tokenomics/engine-ascii
-// Framework-agnostic WebGL ASCII-halftone post effect built on OGL 1.0.11.
-// Verified API (OGL 1.0.11): Renderer({ canvas, dpr, alpha }), renderer.gl,
-// renderer.setSize(w, h), renderer.render({ scene }); Triangle(gl), Program(gl, { vertex, fragment, uniforms }), Mesh(gl, { geometry, program }).
-//
-// The effect samples a procedural plasma pattern, computes luminance, then quantizes it
-// into a stepped ASCII-style ramp rendered as a glyph-cell halftone (no external atlas).
-// Robust + dependency-free shading: stepped/posterized luminance per character cell.
+// @tokenomics/engine-ascii — framework-agnostic 2D-canvas glyph engines for the
+// landing. Two renderers, ported from the approved design:
+//   • MorphField  — the hero "right-sizing" field: excess glyph mass (p=0) thins
+//     down to the task footprint (p=1); the emptiness that opens up is savings.
+//   • Substrate   — a frozen low-contrast halftone whose brightness band tracks
+//     scroll progress (only brightness moves).
+// No DOM framework, no deps. Each owns one <canvas>.
 
-import { Mesh, Program, Renderer, Triangle } from "ogl";
+function hash(x: number, y: number): number {
+  const n = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+  return n - Math.floor(n);
+}
 
-export interface AsciiFieldOptions {
-  /** Device pixel ratio cap. Default: min(devicePixelRatio, 2). */
-  dpr?: number;
-  /** Number of luminance steps in the ASCII ramp. Default: 8. */
-  levels?: number;
-  /** Size of a glyph cell in CSS pixels. Default: 8. */
-  cell?: number;
-  /** Animation speed multiplier. Default: 1. */
-  speed?: number;
-  /** Foreground (glyph) color, linear 0..1 RGB. Default: greenish terminal. */
-  color?: [number, number, number];
-  /** Background color, linear 0..1 RGB. Default: near-black. */
-  background?: [number, number, number];
-  /**
-   * When true, render a single static frame and never animate.
-   * Caller should pass matchMedia('(prefers-reduced-motion: reduce)').matches.
-   */
+const FONT = (px: number): string => `${px}px 'Geist Mono','JetBrains Mono',monospace`;
+
+export class MorphField {
+  private canvas: HTMLCanvasElement;
+  private ctx: CanvasRenderingContext2D;
+  private fs = 18;
+  private lh = 21;
+  private chW: number;
+  private cols = 0;
+  private rows = 0;
+  /** current morph progress 0..1 */
+  p = 0;
+  private ramp = " .·:-=+ox#%@█";
+
+  constructor(canvas: HTMLCanvasElement) {
+    this.canvas = canvas;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("MorphField: 2d context unavailable");
+    this.ctx = ctx;
+    this.chW = this.fs * 0.6;
+    this.size();
+  }
+
+  size(): void {
+    const host = this.canvas.parentElement;
+    if (!host) return;
+    const r = host.getBoundingClientRect();
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    this.canvas.width = Math.max(1, r.width * dpr);
+    this.canvas.height = Math.max(1, r.height * dpr);
+    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this.ctx.font = FONT(this.fs);
+    this.ctx.textBaseline = "top";
+    this.chW = this.ctx.measureText("M").width || this.fs * 0.6;
+    this.cols = Math.ceil(r.width / this.chW) + 1;
+    this.rows = Math.ceil(r.height / this.lh) + 1;
+    this.render(this.p);
+  }
+
+  render(p: number): void {
+    this.p = p;
+    const ctx = this.ctx;
+    const C = this.cols;
+    const R = this.rows;
+    const ramp = this.ramp;
+    ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    ctx.font = FONT(this.fs);
+    ctx.textBaseline = "top";
+    for (let y = 0; y < R; y++) {
+      const ny = y / R - 0.5;
+      const band = 1 - Math.min(1, Math.abs(ny) / 0.34);
+      for (let x = 0; x < C; x++) {
+        const nx = x / C - 0.5;
+        const e = (nx * nx) / (0.37 * 0.37) + (ny * ny) / (0.3 * 0.3);
+        if (e < 1) continue; // quiet ellipse keeps the headline legible
+        const fade = e < 1.5 ? (e - 1) / 0.5 : 1;
+        const h = hash(x, y);
+        const necessity = band * 0.82 + h * 0.18;
+        const thr = p * (0.52 + 0.46 * hash(x * 1.7, y * 0.9));
+        if (necessity < thr) continue; // trimmed → negative space (savings)
+        const front = necessity < thr + 0.05; // cut-edge cells glow
+        const heavy = (1 - p) * 0.62 + necessity * 0.38;
+        const gi = Math.max(1, Math.min(ramp.length - 1, Math.round(heavy * (ramp.length - 1))));
+        const ch = ramp[gi];
+        let col: string;
+        let a: number;
+        if (front && p > 0.02) {
+          col = "108,240,168";
+          a = 0.9 * fade;
+        } else {
+          const lv = 96 + Math.round(heavy * 70);
+          col = `${lv},${lv},${lv - 6}`;
+          a = (0.14 + 0.34 * heavy) * fade;
+        }
+        ctx.fillStyle = `rgba(${col},${a})`;
+        ctx.fillText(ch ?? "#", x * this.chW, y * this.lh);
+      }
+    }
+  }
+}
+
+export interface SubstrateOptions {
   reducedMotion?: boolean;
 }
 
-/** A named state the field can morph toward (the landing's story beats). */
-export interface MorphTarget {
-  id: string;
-  /** Optional shape params (reserved for the per-target morph shaders, impl-pass). */
-  density?: number;
-  spread?: number;
-  seed?: number;
-}
-
-/** The set of morph targets + base look for a single field instance. */
-export interface SceneConfig {
-  targets: MorphTarget[];
-  cell?: number;
-  levels?: number;
-  speed?: number;
-  color?: [number, number, number];
-  background?: [number, number, number];
-}
-
-function resolveCanvas(target: HTMLCanvasElement | HTMLElement): {
-  canvas: HTMLCanvasElement;
-  owned: boolean;
-  host: HTMLElement;
-} {
-  if (target instanceof HTMLCanvasElement) {
-    return { canvas: target, owned: false, host: target.parentElement ?? target };
-  }
-  const canvas = document.createElement("canvas");
-  canvas.style.display = "block";
-  canvas.style.width = "100%";
-  canvas.style.height = "100%";
-  target.appendChild(canvas);
-  return { canvas, owned: true, host: target };
-}
-
-const VERTEX = /* glsl */ `
-attribute vec2 uv;
-attribute vec2 position;
-varying vec2 vUv;
-void main() {
-  vUv = uv;
-  gl_Position = vec4(position, 0.0, 1.0);
-}
-`;
-
-const FRAGMENT = /* glsl */ `
-precision highp float;
-
-uniform float uTime;
-uniform vec2 uResolution;
-uniform float uCell;
-uniform float uLevels;
-uniform vec3 uColor;
-uniform vec3 uBackground;
-
-varying vec2 vUv;
-
-// Cheap procedural plasma field -> luminance source.
-float field(vec2 p, float t) {
-  float v = 0.0;
-  v += sin((p.x + t) * 3.1415);
-  v += sin((p.y - t * 0.7) * 2.7);
-  v += sin((p.x + p.y + t * 0.5) * 1.9);
-  v += sin(length(p - 0.5) * 7.0 - t * 1.3);
-  return v / 4.0; // -> ~[-1, 1]
-}
-
-// Stepped 5-dot halftone mask approximating an ASCII glyph for a given coverage level.
-// level in [0,1]; cellUv in [0,1] within the character cell.
-float glyphMask(vec2 cellUv, float level) {
-  vec2 c = cellUv - 0.5;
-  float d = length(c) * 2.0; // 0 center -> ~1 edge
-  // Coverage grows with level: a filled disc whose radius tracks luminance.
-  float radius = level * 1.15;
-  float dot = 1.0 - smoothstep(radius - 0.15, radius, d);
-  // Add a scanline texture so dense cells read as glyph strokes, not blobs.
-  float stroke = step(0.5, fract(cellUv.y * 3.0)) * step(0.25, level);
-  return clamp(max(dot, dot * stroke), 0.0, 1.0);
-}
-
-void main() {
-  vec2 res = max(uResolution, vec2(1.0));
-  float cell = max(uCell, 2.0);
-
-  // Snap to glyph cell grid.
-  vec2 px = vUv * res;
-  vec2 cellId = floor(px / cell);
-  vec2 cellUv = fract(px / cell);
-  vec2 cellCenter = (cellId + 0.5) * cell / res;
-
-  // Sample the field at the cell center, derive luminance.
-  float raw = field(cellCenter * 2.0 - 1.0, uTime);
-  float lum = clamp(raw * 0.5 + 0.5, 0.0, 1.0);
-
-  // Posterize luminance into discrete ASCII ramp levels.
-  float levels = max(uLevels, 2.0);
-  float quant = floor(lum * levels) / (levels - 1.0);
-  quant = clamp(quant, 0.0, 1.0);
-
-  float mask = glyphMask(cellUv, quant);
-  vec3 rgb = mix(uBackground, uColor, mask * quant);
-  gl_FragColor = vec4(rgb, 1.0);
-}
-`;
-
-export class AsciiField {
-  private renderer: Renderer | null = null;
-  private mesh: Mesh | null = null;
-  private program: Program | null = null;
-  private host: HTMLElement;
+export class Substrate {
   private canvas: HTMLCanvasElement;
-  private ownedCanvas: boolean;
-  private opts: Required<Omit<AsciiFieldOptions, "reducedMotion">> & { reducedMotion: boolean };
+  private ctx: CanvasRenderingContext2D;
+  private sfs = 16;
+  private slh = 22;
+  private band = 0.5;
+  private bandTarget = 0.5;
+  private scw = 9.6;
+  private scols = 0;
+  private srows = 0;
+  private glyphs = "·.,:;'\"`~-=|/\\";
   private raf = 0;
-  private running = false;
-  private resizeObserver: ResizeObserver | null = null;
-  /** True when WebGL is unavailable; the effect becomes a safe no-op. */
-  readonly supported: boolean;
-  /** Active scene (set via setScene) and current morph progress 0..1. */
-  private scene: SceneConfig | null = null;
-  private morphProgress = 0;
+  private last = 0;
+  private reduce: boolean;
 
-  constructor(canvasOrEl: HTMLCanvasElement | HTMLElement, opts: AsciiFieldOptions = {}) {
-    const dprDefault =
-      typeof window !== "undefined" ? Math.min(window.devicePixelRatio || 1, 2) : 1;
-    this.opts = {
-      dpr: opts.dpr ?? dprDefault,
-      levels: opts.levels ?? 8,
-      cell: opts.cell ?? 8,
-      speed: opts.speed ?? 1,
-      color: opts.color ?? [0.18, 0.95, 0.55],
-      background: opts.background ?? [0.03, 0.04, 0.05],
-      reducedMotion: opts.reducedMotion ?? false,
-    };
+  constructor(canvas: HTMLCanvasElement, opts: SubstrateOptions = {}) {
+    this.canvas = canvas;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Substrate: 2d context unavailable");
+    this.ctx = ctx;
+    this.reduce = opts.reducedMotion ?? false;
+    this.size();
+  }
 
-    const resolved = resolveCanvas(canvasOrEl);
-    this.canvas = resolved.canvas;
-    this.ownedCanvas = resolved.owned;
-    this.host = resolved.host;
+  size(): void {
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    this.canvas.width = Math.max(1, window.innerWidth * dpr);
+    this.canvas.height = Math.max(1, window.innerHeight * dpr);
+    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this.ctx.font = FONT(this.sfs);
+    this.ctx.textBaseline = "top";
+    this.scw = this.ctx.measureText("M").width || 9.6;
+    this.scols = Math.ceil(window.innerWidth / this.scw) + 1;
+    this.srows = Math.ceil(window.innerHeight / this.slh) + 1;
+  }
 
-    // Headless / SSR / no-WebGL guard. Attempt to construct the OGL renderer;
-    // any failure (no document, no GL context) downgrades to an inert instance.
-    let supported = false;
-    if (typeof window !== "undefined") {
-      try {
-        const renderer = new Renderer({
-          canvas: this.canvas,
-          dpr: this.opts.dpr,
-          alpha: false,
-          antialias: false,
-          depth: false,
-        });
-        if (renderer.gl) {
-          this.renderer = renderer;
-          supported = true;
-        }
-      } catch {
-        supported = false;
+  /** 0..1 — where the brightness band sits (driven by scroll progress). */
+  setBandTarget(v: number): void {
+    this.bandTarget = Math.min(1, Math.max(0, v));
+  }
+
+  draw(now: number): void {
+    const ctx = this.ctx;
+    ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    ctx.font = FONT(this.sfs);
+    ctx.textBaseline = "top";
+    this.band += (this.bandTarget - this.band) * 0.06;
+    const bandRow = this.band * this.srows;
+    const sig = this.srows * 0.26;
+    const sig2 = 2 * sig * sig;
+    const tph = (now / 15000) * Math.PI * 2;
+    const G = this.glyphs;
+    const R = this.srows;
+    const C = this.scols;
+    for (let y = 0; y < R; y++) {
+      const dy = y - bandRow;
+      const bandB = Math.exp(-(dy * dy) / sig2);
+      for (let x = 0; x < C; x++) {
+        if ((x + y) % 2 !== 0) continue; // dither — halftone feel + half the draws
+        const h = hash(x * 0.7, y * 1.3);
+        const breath = 0.5 + 0.5 * Math.sin(tph + h * 6.28);
+        const a = 0.016 + 0.02 * breath + 0.05 * bandB;
+        ctx.fillStyle = `rgba(176,176,168,${a})`;
+        ctx.fillText(G[(x * 7 + y * 13) % G.length] ?? ".", x * this.scw, y * this.slh);
       }
     }
-    this.supported = supported;
-  }
-
-  init(): void {
-    if (!this.supported || !this.renderer) return;
-    const gl = this.renderer.gl;
-    const geometry = new Triangle(gl);
-    this.program = new Program(gl, {
-      vertex: VERTEX,
-      fragment: FRAGMENT,
-      uniforms: {
-        uTime: { value: 0 },
-        uResolution: { value: [1, 1] },
-        uCell: { value: this.opts.cell },
-        uLevels: { value: this.opts.levels },
-        uColor: { value: this.opts.color },
-        uBackground: { value: this.opts.background },
-      },
-    });
-    this.mesh = new Mesh(gl, { geometry, program: this.program });
-
-    this.resize();
-    if (typeof ResizeObserver !== "undefined") {
-      this.resizeObserver = new ResizeObserver(() => this.resize());
-      this.resizeObserver.observe(this.host);
-    } else if (typeof window !== "undefined") {
-      window.addEventListener("resize", this.onWindowResize, { passive: true });
-    }
-
-    if (this.opts.reducedMotion) {
-      // Static fallback: render a single frame, do not animate.
-      this.update(0);
-      return;
-    }
-    this.start();
-  }
-
-  private onWindowResize = (): void => this.resize();
-
-  resize(): void {
-    if (!this.renderer || !this.program) return;
-    const rect = this.host.getBoundingClientRect();
-    const w = Math.max(1, Math.floor(rect.width || this.canvas.clientWidth || 1));
-    const h = Math.max(1, Math.floor(rect.height || this.canvas.clientHeight || 1));
-    this.renderer.setSize(w, h);
-    const gl = this.renderer.gl;
-    this.program.uniforms.uResolution.value = [gl.canvas.width, gl.canvas.height];
   }
 
   start(): void {
-    if (this.running || !this.supported) return;
-    this.running = true;
-    const loop = (t: number) => {
-      if (!this.running) return;
-      this.update(t * 0.001);
+    if (this.reduce) {
+      this.draw(0);
+      return;
+    }
+    const loop = (now: number): void => {
+      if (now - this.last > 40) {
+        this.draw(now);
+        this.last = now;
+      }
       this.raf = requestAnimationFrame(loop);
     };
     this.raf = requestAnimationFrame(loop);
   }
 
   stop(): void {
-    this.running = false;
-    if (this.raf) {
-      cancelAnimationFrame(this.raf);
-      this.raf = 0;
-    }
-  }
-
-  /**
-   * Install the scene (the set of morph targets + base look) for this field.
-   * Applies any base look overrides immediately if the program exists.
-   */
-  setScene(scene: SceneConfig): void {
-    this.scene = scene;
-    if (!this.program) return;
-    if (scene.cell != null) this.program.uniforms.uCell.value = scene.cell;
-    if (scene.levels != null) this.program.uniforms.uLevels.value = scene.levels;
-    if (scene.color) this.program.uniforms.uColor.value = scene.color;
-    if (scene.background) this.program.uniforms.uBackground.value = scene.background;
-  }
-
-  /**
-   * Morph the field toward a named target; `progress` is 0..1.
-   * Scaffold behavior: progress thins the glyph mass (the cell grows), a stand-in
-   * for "right-sizing". The full per-target crossfade shaders are the impl-pass TODO.
-   */
-  morphTo(_targetId: string, progress: number): void {
-    this.morphProgress = Math.max(0, Math.min(1, progress));
-  }
-
-  /** Render one frame. `t` is elapsed time in seconds. */
-  update(t: number): void {
-    if (!this.renderer || !this.mesh || !this.program) return;
-    this.program.uniforms.uTime.value = t * this.opts.speed;
-    const baseCell = this.scene?.cell ?? this.opts.cell;
-    this.program.uniforms.uCell.value = baseCell * (1 + this.morphProgress * 1.5);
-    this.renderer.render({ scene: this.mesh });
-  }
-
-  destroy(): void {
-    this.stop();
-    if (this.resizeObserver) {
-      this.resizeObserver.disconnect();
-      this.resizeObserver = null;
-    } else if (typeof window !== "undefined") {
-      window.removeEventListener("resize", this.onWindowResize);
-    }
-    // Best-effort GL teardown.
-    const gl = this.renderer?.gl as
-      | (WebGLRenderingContext & { getExtension(name: string): any })
-      | undefined;
-    try {
-      gl?.getExtension("WEBGL_lose_context")?.loseContext();
-    } catch {
-      /* ignore */
-    }
-    if (this.ownedCanvas && this.canvas.parentElement) {
-      this.canvas.parentElement.removeChild(this.canvas);
-    }
-    this.renderer = null;
-    this.mesh = null;
-    this.program = null;
+    if (this.raf) cancelAnimationFrame(this.raf);
+    this.raf = 0;
   }
 }
-
-export default AsciiField;

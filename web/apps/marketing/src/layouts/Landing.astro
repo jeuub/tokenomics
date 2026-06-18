@@ -1,0 +1,47 @@
+---
+interface Props {
+  title?: string;
+  description?: string;
+}
+const {
+  title = "tokenomics — match the model to the task, every turn",
+  description = "Tokenomics sits in front of Claude Code and opencode and routes each turn to the model that fits it — across DeepSeek, GLM, Gemini, Qwen, Anthropic and more. Tool calls pass through intact; you see which model ran and why. Savings are measured, not promised.",
+} = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600;700&family=Doto:wght@500;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta property="og:title" content={title} />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <style is:inline>
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; background: #0a0a0b; }
+      ::selection { background: #6cf0a8; color: #0a0a0b; }
+      @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+      @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+      a, button { font-family: inherit; }
+      @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
+      @media (max-width: 760px) { .hide-sm { display: none !important; } }
+      #root > section, #root > footer { position: relative; z-index: 1; }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      style="position:relative; isolation:isolate; background:transparent; color:#e6e6e1; font-family:'Geist Mono','JetBrains Mono',ui-monospace,monospace; -webkit-font-smoothing:antialiased; overflow-x:hidden;"
+    >
+      <slot />
+    </div>
+  </body>
+</html>

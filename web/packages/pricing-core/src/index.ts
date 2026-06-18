@@ -1,130 +1,104 @@
-// @tokenomics/pricing-core — the SINGLE numeric source of truth.
-// Zero runtime deps. ALL model pricing + the routing-savings estimate live here;
-// the marketing app only ever FORMATS what this module returns. No %/$ is hardcoded
-// anywhere else in the landing.
-//
-// Numbers are verbatim from the agreed NUMBERS block ($ per 1,000,000 tokens).
-// estimate() is a direct port of scan/tokenomics-scan.mjs `estimate()`.
+// @tokenomics/pricing-core — the SINGLE source of the landing estimator's math.
+// Zero deps. Ported verbatim from the approved design's computeEstimate().
+// Illustrative blended list prices ($ / Mtok); the real number is measured on
+// the user's own traffic. Keep these in one place so the site, scan and the
+// dashboard never disagree.
 
-export type ModelKey = "opus" | "sonnet" | "haiku";
+export type DefaultModel = "opus" | "sonnet";
 
-export type ProviderId =
-  | "free"
-  | "qwen_flash"
-  | "deepseek_v4_flash"
-  | "deepseek_v4_pro"
-  | "glm46"
-  | "glm45_air"
-  | "gemini_flash_lite";
-
-export interface Price {
-  inputPerM: number;
-  outputPerM: number;
-  cacheReadPerM?: number;
-  cacheWritePerM?: number;
-}
-
-// Anthropic-tier prices ($/1M). cacheRead is the warm-cache input rate used as the
-// baseline context cost (a turn re-reads its context from cache each time).
-export const ANTHROPIC_PRICES: Record<ModelKey, Price> = {
-  opus: { inputPerM: 5, outputPerM: 25, cacheReadPerM: 0.5, cacheWritePerM: 6.25 },
-  sonnet: { inputPerM: 3, outputPerM: 15, cacheReadPerM: 0.3, cacheWritePerM: 3.75 },
-  haiku: { inputPerM: 1, outputPerM: 5, cacheReadPerM: 0.1, cacheWritePerM: 1.25 },
-};
-
-// Routing targets ($/1M). These are charged at their plain input/output rates.
-export const PROVIDER_PRICES: Record<ProviderId, Price> = {
-  free: { inputPerM: 0, outputPerM: 0 },
-  qwen_flash: { inputPerM: 0.05, outputPerM: 0.4 },
-  deepseek_v4_flash: { inputPerM: 0.14, outputPerM: 0.28 },
-  deepseek_v4_pro: { inputPerM: 0.435, outputPerM: 0.87 },
-  glm46: { inputPerM: 0.6, outputPerM: 2.2 },
-  glm45_air: { inputPerM: 0.2, outputPerM: 1.1 },
-  gemini_flash_lite: { inputPerM: 0.1, outputPerM: 0.4 },
-};
-
-export type Tier = "trivial" | "routine" | "medium" | "hard";
-
-export interface MixTier {
-  tier: Tier;
-  share: number;
-  /** null = the turn is kept on your default model (no cheaper-and-sufficient route). */
-  routed: ProviderId | null;
-  avgOutputTokens: number;
-}
-
-// Illustrative task distribution (shares sum to 1.0). Verbatim from NUMBERS block.
-export const MIX: MixTier[] = [
-  { tier: "trivial", share: 0.25, routed: "free", avgOutputTokens: 150 },
-  { tier: "routine", share: 0.35, routed: "deepseek_v4_flash", avgOutputTokens: 350 },
-  { tier: "medium", share: 0.25, routed: "glm46", avgOutputTokens: 600 },
-  { tier: "hard", share: 0.15, routed: null, avgOutputTokens: 900 },
-];
+export const LANDING_PRICES = {
+  opus: 15,
+  sonnet: 3,
+  haiku: 0.8,
+  glm: 0.6,
+  deepseek: 0.3,
+  qwen: 0.2,
+  gemini: 0.15,
+  free: 0,
+} as const;
 
 export interface EstimateInput {
-  turnsPerMonth: number;
-  avgContextTokens: number;
-  defaultModel: ModelKey;
-}
-
-export interface EstimateTierResult {
-  tier: Tier;
-  baselineUsd: number;
-  routedUsd: number;
+  /** turns per month */
+  turns: number;
+  /** average context per turn, in thousands of tokens */
+  ctxK: number;
+  /** quality headroom 0..10 — higher keeps more turns on your model */
+  effort: number;
+  /** the baseline model the agent would use without us */
+  def: DefaultModel;
+  /** allow third-party + free tiers in the routing pool */
+  third: boolean;
 }
 
 export interface EstimateResult {
-  baselineUsd: number;
-  routedUsd: number;
-  savedUsd: number;
-  savedPct: number;
-  perTier: EstimateTierResult[];
+  turns: number;
+  ctxK: number;
+  effort: number;
+  def: DefaultModel;
+  third: boolean;
+  /** monthly $ on the default model */
+  base: number;
+  /** monthly $ with routing */
+  routed: number;
+  /** monthly $ saved */
+  monthly: number;
+  /** fraction saved 0..1 */
+  pct: number;
+  trivial: number;
+  routine: number;
+  medium: number;
+  kept: number;
 }
 
-/**
- * Per-tier monthly cost on the user's default model (baseline) vs the routed plan.
- *
- * baseline(tier) = turns * share * (avgContext * dCacheRead/1e6 + avgOutput * dOutput/1e6)
- *   where dCacheRead/dOutput are the DEFAULT model's cacheReadPerM/outputPerM.
- * routed(tier)   = if routed === null -> baseline
- *                  else turns * share * (avgContext * p.inputPerM/1e6 + avgOutput * p.outputPerM/1e6)
- * routedUsd      = min(routed, baseline)  // a route is NEVER more expensive than the default.
- */
-export function estimate(input: EstimateInput): EstimateResult {
-  const { turnsPerMonth, avgContextTokens, defaultModel } = input;
-  const def = ANTHROPIC_PRICES[defaultModel];
-  const dCacheRead = def.cacheReadPerM ?? def.inputPerM;
-  const dOutput = def.outputPerM;
+export function estimateLanding(input: EstimateInput): EstimateResult {
+  const { turns, ctxK, effort, def, third } = input;
+  const P = LANDING_PRICES;
+  const mtok = (ctxK + 1) / 1000; // ~1k output added
+  const base = P[def] * mtok; // $/turn on the default
 
-  const perTier: EstimateTierResult[] = [];
-  let baselineUsd = 0;
-  let routedUsd = 0;
+  // task distribution; effort shifts share toward "kept on your model"
+  let trivial = 0.16;
+  let routine = 0.44;
+  let medium = 0.2;
+  const kept = 0.2 + (effort / 10) * 0.3;
+  const movable = trivial + routine + medium;
+  const scale = (1 - kept) / movable;
+  trivial *= scale;
+  routine *= scale;
+  medium *= scale;
 
-  for (const m of MIX) {
-    const turns = turnsPerMonth * m.share;
-    const baseline =
-      (turns * (avgContextTokens * dCacheRead)) / 1e6 +
-      (turns * (m.avgOutputTokens * dOutput)) / 1e6;
+  const mTrivial = third ? P.free : P.haiku;
+  const mRoutine = third ? P.deepseek : P.haiku;
+  const mMedium = third ? P.glm : P.sonnet;
+  const routed =
+    (trivial * mTrivial + routine * mRoutine + medium * mMedium + kept * P[def]) * mtok;
 
-    let routed: number;
-    if (m.routed === null) {
-      routed = baseline;
-    } else {
-      const p = PROVIDER_PRICES[m.routed];
-      routed =
-        (turns * (avgContextTokens * p.inputPerM)) / 1e6 +
-        (turns * (m.avgOutputTokens * p.outputPerM)) / 1e6;
-    }
-    // Never route to something more expensive than just keeping the default.
-    routed = Math.min(routed, baseline);
+  const savePerTurn = Math.max(0, base - routed);
+  const monthly = savePerTurn * turns;
+  const pct = base > 0 ? savePerTurn / base : 0;
+  return {
+    turns,
+    ctxK,
+    effort,
+    def,
+    third,
+    base: base * turns,
+    routed: routed * turns,
+    monthly,
+    pct,
+    trivial,
+    routine,
+    medium,
+    kept,
+  };
+}
 
-    perTier.push({ tier: m.tier, baselineUsd: baseline, routedUsd: routed });
-    baselineUsd += baseline;
-    routedUsd += routed;
+/** Compact $ formatter used by the estimate readouts ("$7.6k", "$420"). */
+export function compactUsd(n: number): string {
+  n = Math.max(0, Math.round(n));
+  if (n >= 1000) {
+    const k = n / 1000;
+    return `$${k >= 100 ? Math.round(k) : k.toFixed(1).replace(/\.0$/, "")}k`;
   }
-
-  const savedUsd = baselineUsd - routedUsd;
-  const savedPct = baselineUsd > 0 ? savedUsd / baselineUsd : 0;
-
-  return { baselineUsd, routedUsd, savedUsd, savedPct, perTier };
+  return `$${n.toLocaleString("en-US")}`;
 }
