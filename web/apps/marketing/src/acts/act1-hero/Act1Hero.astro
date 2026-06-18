@@ -1,0 +1,51 @@
+---
+import { getCopy, LINKS } from "../../content/copy";
+import { MagneticCta } from "@tokenomics/ui";
+import { ACTS } from "../../runtime/acts-registry";
+import { headingId } from "../../utils/a11y";
+
+const lang = Astro.currentLocale ?? "ru";
+const c = getCopy(lang);
+const id = "act1";
+const meta = ACTS.find((a) => a.id === id);
+---
+
+<section
+  id={id}
+  aria-labelledby={headingId(id)}
+  class="relative flex min-h-dvh flex-col items-center justify-center gap-ch6 px-ch4 text-center"
+>
+  {/* Prebaked still for LCP + reduced-motion. The live substrate renders behind it. */}
+  {
+    meta?.prebakedHero ? (
+      <img
+        src={meta.prebakedHero}
+        alt=""
+        aria-hidden="true"
+        width="960"
+        height="540"
+        class="pointer-events-none absolute inset-0 -z-[1] h-full w-full object-cover opacity-40 motion-safe:opacity-0"
+      />
+    ) : null
+  }
+
+  {/* The single <h1> of the entire page. */}
+  <h1
+    id={headingId(id)}
+    class="max-w-measure text-balance font-mono text-4xl font-bold tracking-tight text-fg sm:text-5xl"
+  >
+    {c.h1}
+  </h1>
+
+  <p class="max-w-measure text-pretty font-mono text-base text-fg-muted">{c.sub}</p>
+
+  <ul class="flex max-w-measure flex-col gap-ch1 font-mono text-sm text-fg-muted">
+    {c.support.map((line) => <li>{line}</li>)}
+  </ul>
+
+  <MagneticCta client:visible href={LINKS.getToken}>
+    {c.cta}
+  </MagneticCta>
+
+  <p class="font-mono text-xs text-fg-muted">{c.proofLine}</p>
+</section>

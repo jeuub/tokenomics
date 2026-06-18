@@ -21,7 +21,8 @@
     "@tokenomics/ui": "workspace:*",
     "@tokenomics/engine-ascii": "workspace:*",
     "@tokenomics/engine-motion": "workspace:*",
-    "@tokenomics/i18n": "workspace:*"
+    "@tokenomics/i18n": "workspace:*",
+    "@tokenomics/pricing-core": "workspace:*"
   },
   "devDependencies": {
     "@types/react": "catalog:",

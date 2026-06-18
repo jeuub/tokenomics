@@ -1,0 +1,37 @@
+---
+import { getCopy } from "../../content/copy";
+import TurnLog from "../../components/transparency/TurnLog.island.tsx";
+
+const lang = Astro.currentLocale ?? "ru";
+const c = getCopy(lang);
+const id = "act6";
+
+const isEn = lang === "en";
+const rowLabels = {
+  routedTo: isEn ? "routed to" : "маршрут",
+  why: isEn ? "why" : "почему",
+};
+const toggleLabels = {
+  more: isEn ? "show all" : "показать все",
+  less: isEn ? "show fewer" : "свернуть",
+};
+---
+
+{/*
+  The TurnLog island owns the <h2> (rendered via ScrambleText as="h2"), so this section
+  intentionally has no separate heading — keeps exactly one h2 per section.
+*/}
+<section
+  id={id}
+  aria-label={c.act6Title}
+  class="relative mx-auto flex min-h-dvh max-w-measure flex-col justify-center gap-ch4 px-ch4"
+>
+  <p class="font-mono text-base text-fg-muted">{c.act6Body}</p>
+  <TurnLog
+    client:visible
+    title={c.act6Title}
+    rowLabels={rowLabels}
+    toggleLabels={toggleLabels}
+  />
+  <p class="font-mono text-xs text-fg-muted">{c.proofLine}</p>
+</section>

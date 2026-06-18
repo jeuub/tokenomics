@@ -132,6 +132,9 @@ importers:
       '@tokenomics/i18n':
         specifier: workspace:*
         version: link:../../packages/i18n
+      '@tokenomics/pricing-core':
+        specifier: workspace:*
+        version: link:../../packages/pricing-core
       '@tokenomics/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -180,11 +183,16 @@ importers:
         specifier: ^2.20.0
         version: 2.20.0(typescript@6.0.3)
 
+  packages/pricing-core: {}
+
   packages/ui:
     dependencies:
       '@hookform/resolvers':
         specifier: ^5.4.0
         version: 5.4.0(react-hook-form@7.79.0(react@19.2.7))
+      '@tokenomics/engine-motion':
+        specifier: workspace:*
+        version: link:../engine-motion
       react:
         specifier: ^19.2.0
         version: 19.2.7

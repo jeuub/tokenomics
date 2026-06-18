@@ -1,27 +1,27 @@
 ---
-import Hero from "../components/Hero.tsx";
 import Base from "../layouts/Base.astro";
+import Act0Boot from "../acts/act0-boot/Act0Boot.astro";
+import Act1Hero from "../acts/act1-hero/Act1Hero.astro";
+import Act2Problem from "../acts/act2-problem/Act2Problem.astro";
+import Act3Mechanism from "../acts/act3-mechanism/Act3Mechanism.astro";
+import Act4Distribution from "../acts/act4-distribution/Act4Distribution.astro";
+import Act5Proof from "../acts/act5-proof/Act5Proof.astro";
+import Act6Transparency from "../acts/act6-transparency/Act6Transparency.astro";
+import Act7Byok from "../acts/act7-byok/Act7Byok.astro";
+import Act8Price from "../acts/act8-price/Act8Price.astro";
 ---
 
-<Base title="tokenomics" description="Правильный инструмент под задачу.">
-  <main class="mx-auto max-w-3xl px-6 py-24">
-    <section class="mb-24">
-      <Hero client:visible heading="tokenomics" cta="Начать" />
-    </section>
-
-    <section class="mb-16 border-t border-zinc-800 pt-8">
-      <h2 class="mb-2 text-xl font-semibold">Под задачу, а не overkill</h2>
-      <p class="text-zinc-400">Подбирайте инструмент по требованиям, а не по хайпу.</p>
-    </section>
-
-    <section class="mb-16 border-t border-zinc-800 pt-8">
-      <h2 class="mb-2 text-xl font-semibold">Прозрачные затраты</h2>
-      <p class="text-zinc-400">Экономия — следствие правильного выбора.</p>
-    </section>
-
-    <section class="border-t border-zinc-800 pt-8">
-      <h2 class="mb-2 text-xl font-semibold">Провайдер-нейтрально</h2>
-      <p class="text-zinc-400">Никакой привязки к одному вендору.</p>
-    </section>
-  </main>
+<Base
+  title="tokenomics — Своя модель под каждый ход."
+  description="Tokenomics направляет каждый ход к подходящей модели. Экономия измеряется, а не обещается."
+>
+  <Act0Boot />
+  <Act1Hero />
+  <Act2Problem />
+  <Act3Mechanism />
+  <Act4Distribution />
+  <Act5Proof />
+  <Act6Transparency />
+  <Act7Byok />
+  <Act8Price />
 </Base>

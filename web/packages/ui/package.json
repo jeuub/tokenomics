@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",
+    "@tokenomics/engine-motion": "workspace:*",
     "react-hook-form": "^7.79.0",
     "uplot": "^1.6.32",
     "zod": "^4.4.3"

@@ -14,7 +14,7 @@
 
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { Lenis } from "lenis";
+import Lenis from "lenis";
 
 export interface SmoothScrollOptions {
   /** Lenis lerp factor (0..1). Default Lenis behavior if omitted. */
@@ -172,6 +172,140 @@ export class SmoothScroll {
       this.lenis.destroy();
       this.lenis = null;
     }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Pointer capability (used to gate magnetic/horizontal interactions to mice).
+// ---------------------------------------------------------------------------
+function isFinePointer(): boolean {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
+  return window.matchMedia("(pointer: fine)").matches;
+}
+
+// ---------------------------------------------------------------------------
+// createScramble — dependency-light randomized-glyph text reveal (NOT the paid
+// GSAP ScrambleTextPlugin). Reveals `finalText` left-to-right; unrevealed chars
+// show a random glyph. Whitespace is never scrambled (stable layout).
+// ---------------------------------------------------------------------------
+const DEFAULT_SCRAMBLE_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#%&@$/\\<>*+-=";
+
+export interface ScrambleToOptions {
+  duration?: number;
+  chars?: string;
+}
+export interface ScrambleController {
+  to(el: HTMLElement, finalText: string, opts?: ScrambleToOptions): void;
+  destroy(): void;
+}
+export interface ScrambleOptions {
+  reducedMotion?: boolean;
+}
+
+export function createScramble(opts: ScrambleOptions = {}): ScrambleController {
+  const reduced =
+    opts.reducedMotion ??
+    (typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true);
+  const proxies = new Set<{ p: number }>();
+
+  const randChar = (chars: string): string =>
+    chars.charAt(Math.floor(Math.random() * chars.length));
+
+  return {
+    to(el, finalText, o = {}) {
+      if (reduced || typeof window === "undefined") {
+        el.textContent = finalText;
+        return;
+      }
+      const chars = o.chars ?? DEFAULT_SCRAMBLE_CHARS;
+      const duration = o.duration ?? 1.2;
+      gsap.killTweensOf(el);
+      const proxy = { p: 0 };
+      proxies.add(proxy);
+      gsap.to(proxy, {
+        p: 1,
+        duration,
+        ease: "none",
+        onUpdate: () => {
+          const revealed = Math.floor(proxy.p * finalText.length);
+          let out = "";
+          for (let i = 0; i < finalText.length; i++) {
+            const ch = finalText.charAt(i);
+            if (i < revealed || ch === " " || ch === "\n" || ch === "\t") out += ch;
+            else out += randChar(chars);
+          }
+          el.textContent = out;
+        },
+        onComplete: () => {
+          el.textContent = finalText;
+          proxies.delete(proxy);
+        },
+      });
+    },
+    destroy() {
+      for (const proxy of proxies) gsap.killTweensOf(proxy);
+      proxies.clear();
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// HorizontalPin — pin a section and translate its container left across the
+// scroll distance. pointer:fine + motion only; touch / reduced-motion fall back
+// to native vertical scroll (no-op).
+// ---------------------------------------------------------------------------
+export interface HorizontalPinSpec {
+  trigger: Element | string;
+  container: Element | string;
+  reducedMotion?: boolean;
+  end?: string;
+  build?: (tl: gsap.core.Timeline) => void;
+}
+
+export class HorizontalPin {
+  private spec: HorizontalPinSpec;
+  private tl: gsap.core.Timeline | null = null;
+
+  constructor(spec: HorizontalPinSpec) {
+    this.spec = spec;
+  }
+
+  init(): void {
+    if (typeof window === "undefined") return;
+    const reduced =
+      this.spec.reducedMotion ??
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
+    if (reduced || !isFinePointer()) return; // native vertical scroll fallback
+
+    ensurePlugin();
+    const resolve = (t: Element | string): Element | null =>
+      typeof t === "string" ? document.querySelector(t) : t;
+    const trigger = resolve(this.spec.trigger);
+    const container = resolve(this.spec.container);
+    if (!(trigger instanceof HTMLElement) || !(container instanceof HTMLElement)) return;
+
+    const distance = Math.max(0, container.scrollWidth - window.innerWidth);
+    const tl = gsap.timeline({
+      scrollTrigger: {
+        trigger,
+        start: "top top",
+        end: this.spec.end ?? `+=${distance}`,
+        scrub: true,
+        pin: true,
+        anticipatePin: 1,
+        invalidateOnRefresh: true,
+      },
+    });
+    tl.to(container, { x: -distance, ease: "none" });
+    this.spec.build?.(tl);
+    this.tl = tl;
+  }
+
+  destroy(): void {
+    this.tl?.scrollTrigger?.kill();
+    this.tl?.kill();
+    this.tl = null;
   }
 }
 

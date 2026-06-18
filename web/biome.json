@@ -16,7 +16,8 @@
       "!**/routeTree.gen.ts",
       "!**/paraglide",
       "!**/*.astro",
-      "!**/*.css"
+      "!**/*.css",
+      "!**/scripts"
     ]
   },
   "formatter": {

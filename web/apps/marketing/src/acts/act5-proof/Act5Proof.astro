@@ -1,0 +1,34 @@
+---
+import { getCopy } from "../../content/copy";
+import Proof from "./Proof.island.tsx";
+import { headingId } from "../../utils/a11y";
+
+const lang = Astro.currentLocale ?? "ru";
+const c = getCopy(lang);
+const id = "act5";
+
+const isEn = lang === "en";
+const labels = {
+  baseline: c.act5Baseline,
+  routed: c.act5Routed,
+  saved: c.act5Saved,
+  proofLine: c.proofLine,
+  turnsLabel: isEn ? "turns / month" : "ходов / месяц",
+  contextLabel: isEn ? "avg context" : "сред. контекст",
+  modelLabel: isEn ? "default model" : "модель по умолчанию",
+  modelLow: isEn ? "lighter default" : "лёгкая по умолчанию",
+  modelHigh: isEn ? "heavier default" : "тяжёлая по умолчанию",
+};
+---
+
+<section
+  id={id}
+  aria-labelledby={headingId(id)}
+  class="relative mx-auto flex min-h-dvh max-w-measure flex-col justify-center gap-ch4 px-ch4"
+>
+  <h2 id={headingId(id)} class="font-mono text-2xl font-semibold text-fg">{c.act5Title}</h2>
+  <p class="font-mono text-base text-fg-muted">{c.act5Body}</p>
+
+  {/* Interactive proof: sliders -> pricing-core.estimate() -> bars + DecodeNumber. */}
+  <Proof client:visible labels={labels} />
+</section>

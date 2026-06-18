@@ -1,8 +1,14 @@
 {
   "$schema": "https://inlang.com/schema/inlang-message-format",
-  "hero_title": "Pay for tokens, not for overkill",
-  "hero_sub": "Pick the right model for the job — no overkill.",
-  "cta_connect": "Connect",
+  "hero_title": "Match the model to the task. Every turn.",
+  "hero_sub": "Tokenomics sits in front of Claude Code and opencode and routes each turn to the model that fits it — across DeepSeek, GLM, Gemini, Qwen, Anthropic and more. Tool calls pass through intact; you see which model ran and why. Savings are measured, not promised.",
+  "support_per_turn": "Per turn, not per session — matched to the work in front of it.",
+  "support_neutral": "Provider-neutral. Bring your own keys; cloud or self-host.",
+  "support_shown": "Every route is shown: which model, and why.",
+  "cta_connect": "Connect your keys.",
+  "proof_line": "Savings are measured, not promised.",
   "nav_pricing": "Pricing",
-  "nav_docs": "Docs"
+  "nav_docs": "Docs",
+  "nav_login": "login",
+  "nav_get_token": "get-token"
 }

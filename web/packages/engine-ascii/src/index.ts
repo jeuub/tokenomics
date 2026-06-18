@@ -29,6 +29,25 @@ export interface AsciiFieldOptions {
   reducedMotion?: boolean;
 }
 
+/** A named state the field can morph toward (the landing's story beats). */
+export interface MorphTarget {
+  id: string;
+  /** Optional shape params (reserved for the per-target morph shaders, impl-pass). */
+  density?: number;
+  spread?: number;
+  seed?: number;
+}
+
+/** The set of morph targets + base look for a single field instance. */
+export interface SceneConfig {
+  targets: MorphTarget[];
+  cell?: number;
+  levels?: number;
+  speed?: number;
+  color?: [number, number, number];
+  background?: [number, number, number];
+}
+
 function resolveCanvas(target: HTMLCanvasElement | HTMLElement): {
   canvas: HTMLCanvasElement;
   owned: boolean;
@@ -128,6 +147,9 @@ export class AsciiField {
   private resizeObserver: ResizeObserver | null = null;
   /** True when WebGL is unavailable; the effect becomes a safe no-op. */
   readonly supported: boolean;
+  /** Active scene (set via setScene) and current morph progress 0..1. */
+  private scene: SceneConfig | null = null;
+  private morphProgress = 0;
 
   constructor(canvasOrEl: HTMLCanvasElement | HTMLElement, opts: AsciiFieldOptions = {}) {
     const dprDefault =
@@ -216,7 +238,7 @@ export class AsciiField {
     this.program.uniforms.uResolution.value = [gl.canvas.width, gl.canvas.height];
   }
 
-  private start(): void {
+  start(): void {
     if (this.running || !this.supported) return;
     this.running = true;
     const loop = (t: number) => {
@@ -235,10 +257,34 @@ export class AsciiField {
     }
   }
 
+  /**
+   * Install the scene (the set of morph targets + base look) for this field.
+   * Applies any base look overrides immediately if the program exists.
+   */
+  setScene(scene: SceneConfig): void {
+    this.scene = scene;
+    if (!this.program) return;
+    if (scene.cell != null) this.program.uniforms.uCell.value = scene.cell;
+    if (scene.levels != null) this.program.uniforms.uLevels.value = scene.levels;
+    if (scene.color) this.program.uniforms.uColor.value = scene.color;
+    if (scene.background) this.program.uniforms.uBackground.value = scene.background;
+  }
+
+  /**
+   * Morph the field toward a named target; `progress` is 0..1.
+   * Scaffold behavior: progress thins the glyph mass (the cell grows), a stand-in
+   * for "right-sizing". The full per-target crossfade shaders are the impl-pass TODO.
+   */
+  morphTo(_targetId: string, progress: number): void {
+    this.morphProgress = Math.max(0, Math.min(1, progress));
+  }
+
   /** Render one frame. `t` is elapsed time in seconds. */
   update(t: number): void {
     if (!this.renderer || !this.mesh || !this.program) return;
     this.program.uniforms.uTime.value = t * this.opts.speed;
+    const baseCell = this.scene?.cell ?? this.opts.cell;
+    this.program.uniforms.uCell.value = baseCell * (1 + this.morphProgress * 1.5);
     this.renderer.render({ scene: this.mesh });
   }
 
