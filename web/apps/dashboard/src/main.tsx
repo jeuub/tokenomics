@@ -4,7 +4,7 @@ import { StrictMode } from "react";
 import ReactDOM from "react-dom/client";
 import { queryClient } from "./query";
 import { router } from "./router";
-import "./styles.css";
+import "./app.css";
 
 const rootElement = document.getElementById("root")!;
 
