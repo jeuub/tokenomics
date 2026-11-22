@@ -1,80 +1,45 @@
 # Tokenomics
 
-**Прокси-арбитр стоимости запросов для кодинг-агентов: он понимает кэш промптов, не ломает вызовы инструментов и принимает решение о цене на каждом ходе диалога.**
+**A cost-aware proxy for coding agents: it understands prompt caching, never breaks tool calls, and decides on price on every turn of the conversation.**
 
-Tokenomics — это прозрачный прокси, который встаёт между кодинг-агентом и языковой моделью (LLM, large language model — большая языковая модель). С агентом он стыкуется незаметно: Claude Code подключается через переменную окружения `ANTHROPIC_BASE_URL`, а такие инструменты, как opencode, Cline и aider, — через OpenAI-совместимый интерфейс. На каждом ходе диалога (per-turn, то есть при каждой паре «запрос пользователя — ответ модели») прокси принимает два решения. Первое: какая из доступных моделей самая дешёвая из тех, что ещё справятся с этим запросом. Второе: нужен ли модели вообще весь накопленный контекст или его можно урезать. Оба решения он применяет на лету (in-flight, прямо в проходящем запросе), не нарушая при этом состояние вызовов инструментов (tool-call state) и не разрушая кэш промптов (prompt-cache, механизм провайдера, который удешевляет повторную отправку одного и того же начала диалога).
+Tokenomics is a transparent proxy that sits between a coding agent and the LLM. It plugs in without changes to the agent: Claude Code connects through the `ANTHROPIC_BASE_URL` environment variable, and tools like opencode, Cline and aider through an OpenAI-compatible API.
 
-> Рабочее имя репозитория — `tokenomics` (так проект называет сам автор). Это НЕ форк
-> репозитория `Tokenomics-AI/Tokenomics`. Почему тот референс слабый, разобрано в
-> [market-and-positioning.md §5](docs/market-and-positioning.md).
+On every turn (one user message and one model response) the proxy makes two decisions:
 
----
+1. **Which model is the cheapest one that can still handle this request.**
+2. **Does the model need the whole accumulated context, or can it be trimmed.**
 
-## Главный тезис (verdict)
+Both decisions are applied in-flight, without breaking tool-call state and without destroying the provider's prompt cache.
 
-Ниже — итоговый вывод исследования о том, где в этой области есть жизнеспособный продукт, а где нет.
+The typical case: a 150k-token session where the user types something short like "are you stuck?", "what's the status?" or "rename this variable". That turn shouldn't cost as much as a top-tier model reading the full context.
 
-- **«Роутер моделей» как самостоятельный продукт — это проигранная категория.** Под роутером моделей здесь понимается сервис, который сам выбирает, какой модели отдать запрос. Эта функция коммодитизируется, то есть превращается в дешёвый взаимозаменяемый товар без наценки. Доказательств тому несколько. Исследование RouterArena за 2026 год прямо заявляет: универсально-оптимального роутера не существует. Открытые (OSS, open-source software — ПО с открытым исходным кодом) решения дают ту же точность, что и коммерческие, примерно за пятую часть цены. Компанию Portkey поглотила Palo Alto. NVIDIA сворачивает свой проект LLM Router.
-- **Но один конкретный участок рынка свободен.** Рынок раскололся надвое. Одни игроки **выбирают модель** — это Not Diamond, Martian, RouteLLM и OpenRouter Auto. Другие **режут контекст**, то есть сокращают объём передаваемой модели истории, — это Headroom, LLMLingua и SWE-Pruner. Третьи **только показывают** раздувание контекста (bloat), ничего с ним не делая, — это ContextSpy. **Никто не делает обе вещи сразу на каждом ходе диалога внутри прокси, который понимает специфику кодинг-агента и при этом сохраняет состояние вызовов инструментов.**
-- **Базовый сценарий использования.** Представьте сессию на 150 тысяч токенов, в которой пользователь пишет короткую реплику вроде «ты завис?», «какой статус по ресурсам?» или «переименуй переменную». За такую реплику не должно платиться ни как за самую мощную модель Opus, ни за пересылку всего контекста. Сегодня никто не автоматизирует этот случай по принципу drop-in (то есть как замену, которую достаточно подключить, не меняя остального).
-- **В чём защитный ров (moat).** Защищённость продукта складывается из произведения трёх свойств: целостности вызовов инструментов (tool-call integrity), решений, учитывающих кэш (cache-aware decisioning), и устойчивости к проверкам на кодинг-задачах (coding eval-proof). Эти три свойства спаяны в одно drop-in-решение. Сам по себе роутинг рвом не является.
+## Hard invariants
 
-Питч одной строкой: **«Один env-var, и счёт за Claude Code падает на 40–70%, при этом ничего не ломается.»** (env-var — переменная окружения; здесь имеется в виду, что для подключения достаточно задать единственную переменную.)
+These rules can never be broken:
 
----
+- **Tool-state fidelity.** If a tool-call loop is open (the last response has `stop_reason: tool_use` with unanswered blocks), the request is passed through unchanged. Context can be trimmed or the model switched only on a clean turn boundary, and every `tool_use_id` must have a matching `tool_result`.
+- **Cache awareness.** Naively stripping the start of the conversation destroys the prompt cache, and cache reads cost about 0.1x the normal token price. So trivial turns are handled through a side channel, without touching the canonical cached conversation.
+- **No tool-call tampering.** Executable tool-call content is never modified. It is forwarded verbatim.
 
-## Документы
+## What's in the repo
 
-Таблица ниже — это карта документации проекта: какой файл за что отвечает.
+| Path | What it is |
+| --- | --- |
+| `scan/` | `tokenomics-scan`: a one-command tool that reads your **local** Claude Code logs and prints your real usage profile (turns, context size, default model, actual spend) and an estimate of possible savings. Nothing is uploaded. |
+| `web/` | Frontend monorepo (pnpm workspace): a marketing site on Astro and a dashboard SPA on React + Vite, with shared packages (design tokens, UI kit, i18n, API client). See `web/README.md`. |
 
-| Файл | О чём |
-|---|---|
-| [docs/mvp-plan.md](docs/mvp-plan.md) | **Главный документ.** Описывает максимально тонкий, но уже продаваемый MVP (minimum viable product — минимальный жизнеспособный продукт, версия v0): что в него вошло, что вырезано и почему, какие предусмотрены проверки (eval) и предохранители (guardrails), какие метрики успеха и как устроен план развития от v0 к v1 и v2. |
-| [docs/economics.md](docs/economics.md) | **Модель стоимости (проверена в середине 2026).** Объясняет, когда подход экономически выгоден: при роутинге внутри моделей одной только Anthropic против роутинга между разными провайдерами. Содержит ценовую лестницу моделей, формулы точки безубыточности (break-even), таблицы стоимости сессий и порог, начиная с которого продукт имеет бизнес-смысл. |
-| [docs/model-ranking.md](docs/model-ranking.md) | **Мозг арбитра.** Описывает, как решать, достаточно ли мощна модель для данного хода, не задавая параметры вручную (без хардкода) и не спрашивая пользователя. Логика идёт по этапам: априорные оценки (priors) → самокалибровка на собственных данных (self-calibration) → бандит для холодного старта (bandit cold-start). Бандит — это алгоритм из теории «многоруких бандитов», который на ходу учится выбирать вариант, балансируя между проверкой новых опций и эксплуатацией уже хороших. Также описаны профили способностей моделей (capability-профили) и то, куда в этой схеме попадает только что вышедшая модель. |
-| [docs/feedback-and-experimentation.md](docs/feedback-and-experimentation.md) | **Обратная связь, UX и эксперименты.** Как проводить A/B-тесты, не генерируя два ответа на один запрос: через off-policy-оценку (оценка нового решения по уже собранным логам, без живого эксперимента), рандомизацию по кластерам (cluster-рандомизация) и shadow/dueling-схемы (теневой прогон и попарное сравнение вариантов). Сравнивает бинарный «палец вверх/вниз» (thumbs) с оценкой по шкале 1–5 как с золотым якорем (gold-anchor — эталонный сигнал). Описывает измерение настроения по командам (per-team affect) через иерархическое частичное объединение данных (partial-pooling — статистический приём, при котором оценки отдельных групп подтягиваются к общему среднему). |
-| [docs/architecture.md](docs/architecture.md) | Техническая реализация на уровне отдельного запроса (request-level): путь данных (data-path), конвейер арбитра (arbiter pipeline), безопасная резка контекста, работа с кэшем промптов, дешёвый арбитр в три уровня (L0 → L1 → L2), схема «проверить и при необходимости поднять модель» (verify-and-escalate), псевдоспецификация политики принятия решений (decision-policy) и режимы отказа (failure modes). |
-| [docs/system-design.md](docs/system-design.md) | **Целевой образ системы — долгосрочный, в отличие от первой версии из mvp-plan.** Главная идея — разделить систему надвое. Data-plane (плоскость данных, горячий путь обработки запросов) пишется на компилируемом языке — Rust или Go. Control-plane (плоскость управления, где живёт машинное обучение) работает в стороне от горячего пути и написан на Python. Часть 1 посвящена data-plane, Часть 2 — control-plane вместе с ML- и data-инфраструктурой (хребтом данных). |
-| [docs/cross-cutting-and-topology.md](docs/cross-cutting-and-topology.md) | Часть 3 системного дизайна: топология всей системы, таблица выбора технологий по слоям, мультитенантность (обслуживание нескольких клиентов на одной системе), федерация и дифференциальная приватность (federation/DP, differential privacy — математически гарантированная защита данных), двойная дистрибуция (поставка и как облако, и как self-host вплоть до air-gap — установки в сети без доступа в интернет), упаковка продукта (packaging), масштабирование и высокая доступность (scaling/HA, high availability), безопасность цепочки поставок (supply-chain) и раздел «идеал → что мы откладываем». |
-| [docs/stack-and-structure.md](docs/stack-and-structure.md) | **Стек и структура репозитория (v0).** Финализированный стек с выверенными версиями (Rust + tokio + axum/tower + reqwest/rustls на горячем пути; минимальное хранилище — встроенные SQLite и DuckDB, без внешней инфраструктуры; inference отложен). Дерево Cargo workspace с ответственностью каждого крейта, контракты (эндпоинты, схема telemetry, передача артефакта) и фазировка v0. |
-| [docs/frontend-stack-and-structure.md](docs/frontend-stack-and-structure.md) | **Фронтенд: стек и структура (целевой, под масштаб).** Две поверхности из одной кодовой базы: маркетинг-лендинг на Astro 6 и дашборд-SPA на React 19 + Vite, вшитый в Rust-бинарь через rust-embed + SPA-fallback. Несущее решение — React везде, чтобы UI-кит шарился между Astro-островами и SPA. Pnpm-монорепо (apps/marketing, apps/dashboard; packages design-tokens/ui/engine-ascii[OGL]/engine-motion[GSAP+Lenis]/i18n/api-client), контракт встраивания, auth (in-memory токен + httpOnly refresh, без localStorage), BYOK-страница, хостинг Bunny.net (без Cloudflare), фазировка и анти-оверинжиниринг. §9 — реальность сборки (Vite 7 + Tailwind-PostCSS). |
-| [docs/frontend-marketing-architecture.md](docs/frontend-marketing-architecture.md) | **Архитектура маркетинг-лендинга (файлы/компоненты/границы).** Декомпозиция лендинга (9 актов, сигнатурный морф, фон-субстрат, крафтовый кит, оценщик) в файлы. Структуру собрал сам, прогнал через ревью 5 агентов + синтез. Несущие решения: одно параметрическое глиф-поле (рендер в engine-ascii, акты держат `*.field.ts`-конфиги), один остров-оркестратор ScrollStage (RAF/canvas/Lenis/View-Transitions), ~4 острова вместо 9, новый zero-dep `pricing-core` как единый источник чисел, имена моделей в одном grep-гард-файле, жёсткие CI-гейты честности. Итоговое дерево, нейминг, границы пакет-vs-приложение. |
-| [web/](web/) | **Фронтенд-монорепо (реальный скаффолд, собирается).** Реализация фронтенд-дока: pnpm-воркспейс с двумя приложениями (Astro 6 маркетинг + React 19/Vite 7 дашборд-SPA) и шестью общими пакетами (design-tokens, ui, engine-ascii, engine-motion, i18n, api-client). Cold `pnpm build` зелёный: Paraglide компилируется, оба приложения собираются; lint/typecheck чистые. Toolchain Node ≥22.12 + pnpm 10. Как запускать — [web/README.md](web/README.md). |
-| [docs/host-agent-compatibility.md](docs/host-agent-compatibility.md) | **Совместимость с хост-агентами.** Не портит ли наш прокси опыт Claude Code и не конфликтует ли со встроенным выбором моделей opencode. Ведёт с вердикта по аутентификации: подписка Pro/Max (через OAuth) для нас закрыта, продукт работает только в режиме API-ключа. Дальше — разбор каждой фичи Claude Code (что ломается, что деградирует, что безопасно), коллизии с opencode и матрица рисков. |
-| [docs/user-interface-and-usecases.md](docs/user-interface-and-usecases.md) | **Интерфейс пользователя и юзкейсы.** Какой контроль и какую прозрачность получает пользователь: ручка усилия и качества, ручной выбор модели на один ход, режим отключения, показ того, какая модель ответила и почему и сколько это сэкономило. Конкретные сценарии разобраны как пользовательские истории. |
-| [docs/product-surface-and-onboarding.md](docs/product-surface-and-onboarding.md) | **Продуктовая поверхность и онбординг.** Что пользователь получает функционально, что это за сайт (отдельный лендинг + дашборд, единый для облака и self-host), как именно ставится `ANTHROPIC_BASE_URL` (точные ключи, env против settings.json, облако против self-host) и нужны ли доп-утилиты. Вывод: ядро — только url_base + токен + BYOK в дашборде; CLI `tokenomics init` опциональна. BYOK-хранение и фазировка поверхности (v0.0 HTML-отчёт → v0.1 дашборд). |
-| [docs/design-brief.md](docs/design-brief.md) | **Бриф для дизайна сайта.** Готовый промпт для дизайн-инструмента (без визуального стиля — рефы даёт заказчик): карта сайта (маркетинг + дашборд), постраничный состав и функции каждой страницы, юзкейсы, сквозные UX-принципы, фазировка v0/v1 и критерии ревью макетов. |
-| [docs/design-direction.md](docs/design-direction.md) | **Арт-дирекшн v2 (уровень Awwwards/Behance).** Единый морфящийся глиф-субстрат; две сигнатурные техники (image-as-ASCII халфтон + морф-поле слов OPUS→HAIKU); раскадровка скролл-истории из 9 актов; крафтовый UI-кит вместо bracket-кнопок; моушн-правила (честность, 2 цвета); стек (Astro/Lenis/GSAP/OGL); гард-рейлы a11y/perf/reduced-motion; бенчмарки. Финальная сигнатура выбирается из 5 вариантов. |
-| [docs/app-pages-spec.md](docs/app-pages-spec.md) | **Аутентифицированные страницы приложения — дизайн-спек.** Что юзер видит после логина: connect/онбординг (3 шага), overview/экономия, turns-лог + drill-in, providers/политика (BYOK), settings-shell + 7 подстраниц (account/tokens/providers/billing/privacy/deployment/danger). IA/sitemap, shell (нав + статус-бар + terminal-window карточки + first-run gate), дизайн-система «paper-terminal» (светлая, отдельно от тёмного лендинга), по-страничный layout/компоненты/данные/состояния/копирайт. Спроектировано агентами. |
-| [docs/design-prompt-app.md](docs/design-prompt-app.md) | **Готовый промпт для Claude Design — страницы приложения.** Paste-ready промпт, рисует все 16 пост-логин экранов в едином paper-terminal стиле, консистентно с Landing/Login. Карта страниц + ссылка на спек. |
-| [docs/design-prompt-v2.md](docs/design-prompt-v2.md) | **Готовый промпт для Claude design (v2).** Цельный текст для вставки в дизайн-инструмент: большая идея, две сигнатурные техники, 9-актная скролл-история, крафтовый UI-кит, моушн-правила, стек, фиксы прошлой версии (токен/%/модели/URL) и гард-рейлы. Плюс критерии ревью макетов. |
-| [docs/honest-numbers.md](docs/honest-numbers.md) | **Правдивые числа.** Как считаем экономию выводимо (а не «$1,498 из ниоткуда»): прозрачная модель по профилю юзера, итог зависит от его дефолта (~41% от Sonnet, ~64% от Opus), честно показаны ходы где увод НЕ выгоден. Реалистичный мікс (рутина → DeepSeek/GLM/free, Anthropic только на трудном; Haiku не на «тривиальный» слот), текст сносок и принципы правдивости сайта. |
-| [scan/](scan/) | **tokenomics-scan** — self-serve инструмент в одну команду (`node scan/tokenomics-scan.mjs`, в будущем `npx tokenomics-scan`). Читает ЛОКАЛЬНЫЕ логи Claude Code, печатает реальный профиль (ходы, контекст, дефолт-модель, фактический расход $) и выводимую оценку экономии — ничего не загружая. Это честная замена «красивым числам»: пользователь видит свою цифру. Питает оценщик на сайте. |
-| [docs/market-and-positioning.md](docs/market-and-positioning.md) | Карта конкурентов, разбитых на группы A, B, C и D, описание белого пятна на рынке, позиционирование, профиль идеального клиента и покупателя (ICP, ideal customer profile) и объяснение, почему упомянутый выше референс-репозиторий слабый. |
-| [docs/competitor-user-features.md](docs/competitor-user-features.md) | **User-facing функции конкурентов.** Раз мы заменяем и роутер — какие ручки конкуренты дают конечным пользователям: выбор и закрепление модели, ручка цена-качество, бюджеты и потолки трат, запасные модели, дашборды и аналитика трат, прозрачность выбранной модели, A/B и проверки. Что из этого обязательный минимум, а где можно превзойти. |
-| [docs/monetization-moat-risks.md](docs/monetization-moat-risks.md) | Модели ценообразования (pricing), где находится устойчивый защитный ров (durable moat), стратегия выхода на рынок (GTM, go-to-market) по принципу «сначала открытый клин, затем облако» (OSS wedge → cloud), **контрарианский разбор из 7 причин, по которым проект может умереть**, и условия победы (win-conditions). |
-| [docs/demand-and-hiring-signal.md](docs/demand-and-hiring-signal.md) | Спрос на рынке (объём 8,4 млрд долларов, рост на 140% за полгода), вакансии со словами «token economics» и «TokenOps», разбор «строить самим или купить» (build-vs-buy) и якоря бюджета (ориентиры по суммам, которые рынок готов платить). |
-| [docs/references.md](docs/references.md) | Конкретные репозитории, продукты, научные статьи (папиры) и документация, которые стоит изучить. |
-| [docs/_research-dump.json](docs/_research-dump.json) | Сырой структурированный вывод восьми research-агентов. Это архив и источник правды, к которому можно вернуться. |
+## Running
 
----
+```bash
+# Usage scan (Node 22+)
+node scan/tokenomics-scan.mjs
 
-## Жёсткие инварианты (нарушать нельзя — это и есть ров)
+# Frontend
+cd web
+pnpm install
+pnpm build
+```
 
-Ниже — три правила, которые продукт обязан соблюдать всегда. Именно их соблюдение и образует защитный ров.
+## Status
 
-1. **Сохранность состояния инструментов (tool-state fidelity).** Если открыт цикл вызова инструмента — то есть последний ответ модели пришёл с `stop_reason: tool_use` и в нём есть блоки, на которые ещё не дан ответ, — прокси обязан пропустить запрос **без каких-либо изменений** (passthrough). Резать контекст или менять модель разрешается только на чистой границе хода (turn-boundary), когда ни один вызов инструмента не висит незакрытым. Каждый идентификатор вызова `tool_use_id` обязан иметь парный ему результат `tool_result`.
-2. **Учёт кэша (cache-awareness).** Наивная обрезка начала диалога (стрип префикса) разрушает кэш промптов. Это важно, потому что чтение из кэша (cache-read) стоит всего 0,1 от обычной цены токена, и, разрушив кэш, мы делаем запрос **дороже**, а не дешевле. Поэтому тривиальные ходы нужно обрабатывать только через **боковой канал** (side-channel — отдельный путь обработки), не трогая канонический закэшированный диалог.
-3. **Никакого вмешательства в вызовы инструментов (no tool-call tampering).** Содержимое вызова инструмента, которое будет исполнено (executable-содержимое), нельзя изменять никогда. В ходе исследования обнаружилось, что 9 из 428 проверенных роутеров внедряли (инжектили) в такие вызовы посторонний код. Дословная пересылка без изменений (verbatim passthrough) вместе с возможностью самостоятельного хостинга (self-host) и образует ров.
-
----
-
-## Первый шаг (ещё до написания арбитра)
-
-Прежде чем писать сам арбитр, нужно построить **диагностический** прозрачный прокси — по образцу ContextSpy, но работающий на нашем собственном трафике. В течение одной-двух недель он будет инструментировать (снимать метрики с) реальные сессии Claude Code, опознавая их по заголовку `X-Claude-Code-Session-Id`. Замерить нужно два показателя: **(а) реальную долю ходов, которым контекст не нужен** (context-free), и **(б) долю трафика, идущего от фоновых процессов и субагентов** (background/subagent). Такой замер стоит копейки и при этом подтверждает условия победы №1 и №4 — ещё до того, как тратить месяцы на безопасный переписывающий арбитр (safe-rewrite).
-
----
-
-## Статус
-
-Проект находится в стадии до написания кода (pre-code). Вся документация — это результат многоагентного исследования: над ней работали восемь research-агентов и четыре синтезатора, опираясь на веб-источники середины 2026 года. Все цифры, взятые из веба, — траты (spend), оценки рынка, факты о слияниях и поглощениях (M&A) — приблизительные и помечены как таковые в текстах. Следующий артефакт, который предстоит создать, — техническая спецификация MVP версии v0 с описанием стека технологий и структуры кода.
+Early stage. The scan tool and the frontend scaffold are in place; the proxy itself (planned in Rust: tokio + axum/tower on the hot path, SQLite/DuckDB for local storage) is next. The first step is a diagnostic pass-through proxy that measures, on real Claude Code sessions, how many turns don't need context and how much traffic comes from background agents and subagents.
